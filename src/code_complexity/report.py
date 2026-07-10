@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 from loguru import logger
+from tabulate import tabulate
 
 #: Identifier columns always present in the report.
 ID_COLUMNS: tuple[str, ...] = ("file", "dialect")
@@ -151,6 +152,26 @@ def to_dataframe(rows: list[dict], metrics: list[str] | None, diff: bool) -> pd.
     columns = report_columns(metrics, diff)
     frame = pd.DataFrame(rows, columns=columns)
     return frame
+
+
+def format_table(frame: pd.DataFrame, table_format: str = "rounded_outline") -> str:
+    """Pretty-prints the report DataFrame as a text table.
+
+    Args:
+        frame: The report DataFrame.
+        table_format: Any table format supported by ``tabulate`` (e.g.
+            ``"rounded_outline"``, ``"github"``, ``"psql"``, ``"simple"``).
+
+    Returns:
+        The rendered table; floats are shown with six significant digits.
+    """
+    return tabulate(
+        frame,
+        headers="keys",
+        tablefmt=table_format,
+        showindex=False,
+        floatfmt=".6g",
+    )
 
 
 def save_csv(frame: pd.DataFrame, path: Path, separator: str = ",") -> None:

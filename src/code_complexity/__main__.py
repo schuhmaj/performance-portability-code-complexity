@@ -18,12 +18,12 @@ import argparse
 import sys
 from pathlib import Path
 
-import pandas as pd
 from loguru import logger
 
 from . import __version__
 from .config import load_dialects
 from .evaluate import evaluate
+from .report import format_table
 
 #: Loguru levels selected by the number of ``--verbose`` flags.
 _VERBOSITY_LEVELS: dict[int, str] = {0: "INFO", 1: "DEBUG", 2: "TRACE"}
@@ -116,6 +116,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="append a TOTAL row aggregating all analysed files",
     )
     parser.add_argument(
+        "--table-format",
+        default="rounded_outline",
+        metavar="FMT",
+        help=(
+            "tabulate format for the table printed to stdout, e.g. "
+            "'rounded_outline' (default), 'github', 'psql', 'simple', 'tsv'"
+        ),
+    )
+    parser.add_argument(
         "--keywords-config",
         type=Path,
         metavar="TOML",
@@ -192,10 +201,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("{}", message)
         return 1
 
-    with pd.option_context(
-        "display.max_rows", None, "display.max_columns", None, "display.width", None
-    ):
-        print(frame.to_string(index=False))
+    print(format_table(frame, table_format=args.table_format))
     return 0
 
 

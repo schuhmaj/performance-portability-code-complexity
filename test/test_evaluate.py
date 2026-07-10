@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from code_complexity.evaluate import AGGREGATE_ROW_NAME, collect_source_files, evaluate
-from code_complexity.report import report_columns, resolve_metric_columns
+from code_complexity.report import format_table, report_columns, resolve_metric_columns
 
 CPP_CODE = """\
 #include <vector>
@@ -117,6 +117,19 @@ class TestEvaluate:
         loaded = pd.read_csv(output)
         assert len(loaded) == len(frame)
         assert list(loaded.columns) == list(frame.columns)
+
+
+class TestFormatTable:
+    def test_contains_headers_rows_and_borders(self, project):
+        frame = evaluate([project], metrics=["sloc"])
+        table = format_table(frame)
+        assert "file" in table and "sloc" in table
+        assert "plain.cpp" in table and "impl.cpp" in table
+        assert "╭" in table  # rounded_outline border
+
+    def test_alternative_format(self, project):
+        frame = evaluate([project], metrics=["sloc"])
+        assert "|" in format_table(frame, table_format="github")
 
 
 class TestMetricResolution:
