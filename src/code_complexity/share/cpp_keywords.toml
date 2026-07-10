@@ -1,0 +1,38 @@
+# Baseline C++ token classification for the Halstead analysis.
+#
+# `keywords` are counted as *operators*, `operand_keywords` are keywords that
+# denote values (literals / object references) and are counted as *operands*.
+
+# C++23 keywords plus the identifiers with special meaning (`final`,
+# `override`, `import`, `module`) and the preprocessor-only keywords
+# (`defined`). All of them act on other program entities, hence: operators.
+keywords = [
+    "alignas", "alignof", "and", "and_eq", "asm", "auto",
+    "bitand", "bitor", "bool", "break",
+    "case", "catch", "char", "char8_t", "char16_t", "char32_t", "class",
+    "compl", "concept", "const", "consteval", "constexpr", "constinit",
+    "const_cast", "continue", "co_await", "co_return", "co_yield",
+    "decltype", "default", "defined", "delete", "do", "double",
+    "dynamic_cast",
+    "else", "enum", "explicit", "export", "extern",
+    "final", "float", "for", "friend",
+    "goto",
+    "if", "import", "inline", "int",
+    "long",
+    "module", "mutable",
+    "namespace", "new", "noexcept", "not", "not_eq",
+    "operator", "or", "or_eq", "override",
+    "private", "protected", "public",
+    "register", "reinterpret_cast", "requires", "return",
+    "short", "signed", "sizeof", "static", "static_assert", "static_cast",
+    "struct", "switch",
+    "template", "thread_local", "throw", "try", "typedef", "typeid",
+    "typename",
+    "union", "unsigned", "using",
+    "virtual", "void", "volatile",
+    "wchar_t", "while",
+    "xor", "xor_eq",
+]
+
+# Keywords that reference a value and therefore count as operands.
+operand_keywords = ["true", "false", "nullptr", "this"]

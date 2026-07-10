@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code-complexity"
+version = "0.1.0"
+description = "Halstead complexity and LOC/SLOC metrics for C++ and GPU-enriched C++ (OpenMP, OpenACC, Kokkos, RAJA, Alpaka, CUDA, HIP, SYCL, OpenCL, Vulkan, Boost.Compute, WebGPU/WGSL, GLSL, Slang, Metal)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ email = "jo.schuhmacher37@web.de" }]
+keywords = [
+    "halstead",
+    "complexity",
+    "metrics",
+    "performance-portability",
+    "gpu",
+    "static-analysis",
+]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    "pandas>=2.0",
+    "loguru>=0.7",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+code-complexity = "code_complexity.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+code_complexity = ["share/*.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]

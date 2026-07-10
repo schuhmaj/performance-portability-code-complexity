@@ -1,0 +1,16 @@
+# Conda environment for the code-complexity package.
+#
+# Create the environment and install the package itself with:
+#   conda env create -f environment.yaml
+#   conda activate code-complexity
+#   pip install -e .
+name: code-complexity
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.12          # the package uses 3.12+ features (e.g. tomllib, modern typing)
+  - pandas>=2.0           # result table handling and CSV export
+  - loguru>=0.7           # logging
+  - pytest>=8.0           # running the test suite (development only)
+  - pytest-xdist
+  - pip

@@ -1,0 +1,278 @@
+# Registry of GPU / parallel-programming dialects layered on top of C++.
+#
+# Every table below describes how tokens belonging to one paradigm are
+# recognised. All recognised tokens are counted as *dialect operators*
+# (respectively *dialect operands* inside dialect pragmas), which allows the
+# analysis to separate the baseline C++ metrics from the share that a
+# paradigm adds on top.
+#
+# Per-dialect fields (all optional except `aliases`):
+#   aliases             -- names accepted for `language_dialect` on the CLI/API
+#   namespace_prefixes  -- a qualified name starting with one of these
+#                          prefixes (e.g. "Kokkos" -> "Kokkos::parallel_for")
+#                          is one single dialect operator. Namespace aliases
+#                          ("namespace bc = boost::compute;") are resolved.
+#   identifier_patterns -- regexes (fullmatch) for single identifiers,
+#                          e.g. '^cl_\w+$' for OpenCL types
+#   keywords            -- exact identifiers, e.g. "__global__"
+#   pragma_prefixes     -- '#pragma <prefix> ...' lines belong to the dialect
+#   pragma_clauses      -- identifiers inside such pragmas counted as
+#                          operators (all others count as dialect operands)
+#   punctuation         -- extra punctuation, e.g. the CUDA launch brackets
+#   headers             -- regexes matched against #include'd header names,
+#                          used for automatic dialect detection
+#   extensions          -- file extensions implying the dialect ("auto" mode)
+#   detect_patterns     -- regexes searched in the raw source for automatic
+#                          detection; DETECTION_MIN_HITS matches activate the
+#                          dialect (weaker signal than headers/extensions,
+#                          hence the threshold)
+
+[dialects.openmp]
+aliases = ["openmp", "omp"]
+identifier_patterns = ['omp_\w+', 'OMP_\w+']
+pragma_prefixes = ["omp"]
+pragma_clauses = [
+    "parallel", "for", "simd", "target", "teams", "distribute", "loop",
+    "sections", "section", "single", "master", "masked", "critical",
+    "barrier", "taskwait", "taskgroup", "task", "taskloop", "atomic",
+    "flush", "ordered", "cancel", "threadprivate", "declare", "reduction",
+    "initializer", "map", "to", "from", "tofrom", "alloc", "release",
+    "enter", "exit", "data", "update", "device", "device_num", "if",
+    "num_threads", "num_teams", "thread_limit", "schedule", "collapse",
+    "private", "firstprivate", "lastprivate", "shared", "default",
+    "defaultmap", "linear", "aligned", "safelen", "simdlen", "nowait",
+    "untied", "mergeable", "depend", "priority", "grainsize", "num_tasks",
+    "nogroup", "proc_bind", "dist_schedule", "is_device_ptr",
+    "use_device_ptr", "use_device_addr", "requires", "unified_shared_memory",
+    "static", "dynamic", "guided", "auto", "runtime", "none", "in", "out",
+    "inout",
+]
+headers = ['omp\.h']
+
+[dialects.openacc]
+aliases = ["openacc", "acc"]
+identifier_patterns = ['acc_\w+', 'ACC_\w+']
+pragma_prefixes = ["acc"]
+pragma_clauses = [
+    "parallel", "kernels", "serial", "data", "enter", "exit", "host_data",
+    "loop", "cache", "atomic", "declare", "init", "shutdown", "set",
+    "update", "wait", "routine", "async", "gang", "worker", "vector",
+    "vector_length", "num_gangs", "num_workers", "seq", "independent",
+    "collapse", "tile", "reduction", "copy", "copyin", "copyout", "create",
+    "delete", "present", "deviceptr", "attach", "detach", "device",
+    "device_resident", "host", "self", "use_device", "if", "default",
+    "none", "private", "firstprivate", "no_create", "finalize", "auto",
+    "device_type", "bind", "nohost", "read", "write", "capture",
+]
+headers = ['openacc\.h']
+
+[dialects.kokkos]
+aliases = ["kokkos"]
+namespace_prefixes = ["Kokkos"]
+identifier_patterns = ['KOKKOS_\w+']
+headers = ['Kokkos_\w+\.hpp', 'Kokkos_Core\.hpp']
+
+[dialects.raja]
+aliases = ["raja"]
+namespace_prefixes = ["RAJA", "camp"]
+identifier_patterns = ['RAJA_\w+']
+headers = ['RAJA/\w+\.hpp', 'RAJA\.hpp']
+
+[dialects.alpaka]
+aliases = ["alpaka"]
+namespace_prefixes = ["alpaka"]
+identifier_patterns = ['ALPAKA_\w+']
+headers = ['alpaka/.+']
+
+[dialects.cuda]
+detect_patterns = ['\bcuda[A-Z]\w+', '__global__|__device__|__host__|__shared__|\bthreadIdx\b|\bblockIdx\b']
+aliases = ["cuda"]
+namespace_prefixes = ["cooperative_groups", "nvcuda", "cub", "cg"]
+identifier_patterns = [
+    'cuda[A-Z]\w*',            # runtime API: cudaMalloc, cudaMemcpy, ...
+    'cu[A-Z]\w*',              # driver API: cuMemAlloc, cuLaunchKernel, ...
+    'cudla\w+', 'curand\w*', 'cublas\w*', 'cufft\w*', 'cusparse\w*',
+    'CUDA_\w+', 'CU[A-Z_]+',
+    '__\w+__',                 # __global__, __device__, __shared__, ...
+    'u?(?:char|short|int|long|longlong)[1-4]', '(?:float|double)[1-4]',
+    'dim3',
+    'atomic[A-Z]\w*', '__sync\w+', '__shfl\w*', '__ldg', '__restrict__',
+]
+keywords = ["threadIdx", "blockIdx", "blockDim", "gridDim", "warpSize"]
+punctuation = ["<<<", ">>>"]
+headers = ['cuda\w*\.h', 'cuda_runtime\.h', 'device_launch_parameters\.h', 'cub/.+']
+extensions = [".cu", ".cuh"]
+
+# Thrust is available on both CUDA and ROCm (rocThrust), hence its own entry.
+[dialects.thrust]
+aliases = ["thrust", "rocthrust"]
+namespace_prefixes = ["thrust"]
+identifier_patterns = ['THRUST_\w+']
+headers = ['thrust/.+']
+
+[dialects.hip]
+detect_patterns = ['\bhip[A-Z]\w+', '\bHIP_\w+']
+aliases = ["hip", "rocm"]
+namespace_prefixes = ["rocprim", "hipcub"]
+identifier_patterns = [
+    'hip[A-Z]\w*', 'HIP_\w+', 'HIP[A-Z]\w*',
+    '__\w+__',
+    'u?(?:char|short|int|long|longlong)[1-4]', '(?:float|double)[1-4]',
+    'dim3',
+    'atomic[A-Z]\w*', '__sync\w+', '__shfl\w*', '__restrict__',
+]
+keywords = ["threadIdx", "blockIdx", "blockDim", "gridDim", "warpSize"]
+punctuation = ["<<<", ">>>"]
+headers = ['hip/.+', 'hip_runtime\.h']
+extensions = [".hip"]
+
+# pCUDA: AdaptiveCpp's portable CUDA dialect, see
+# https://github.com/AdaptiveCpp/AdaptiveCpp/blob/develop/doc/pcuda.md
+# It offers the CUDA programming model (kernel attributes, built-in index
+# variables, chevron launches) plus a native 'pcuda*' API and cuda*/hip*
+# compatibility APIs, compiled with acpp via --acpp-pcuda.
+[dialects.pcuda]
+detect_patterns = ['\bpcuda[A-Z]\w+', '\b__acpp_\w+']
+aliases = ["pcuda"]
+namespace_prefixes = ["sycl::AdaptiveCpp_pcuda"]
+identifier_patterns = [
+    'pcuda[A-Z]\w*',           # native API: pcudaMalloc, pcudaParallelFor,
+                               # pcudaLaunchKernelGGL, pcudaError_t, ...
+    '__acpp_\w+', 'ACPP_\w+',  # __acpp_sscp_is_device / _is_host, macros
+    'cuda[A-Z]\w*',            # CUDA compatibility API: cudaMalloc, ...
+    'hip[A-Z]\w*',             # HIP compatibility API: hipMalloc, ...
+    '__\w+__',                 # __global__, __device__, __shared__, ...
+    'u?(?:char|short|int|long|longlong)[1-4]', '(?:float|double)[1-4]',
+    'dim3',
+    'atomic[A-Z]\w*', '__sync\w+', '__shfl\w*', '__restrict__',
+]
+keywords = ["threadIdx", "blockIdx", "blockDim", "gridDim", "warpSize"]
+punctuation = ["<<<", ">>>"]
+headers = ['pcuda\.hpp']
+
+[dialects.sycl]
+aliases = ["sycl", "acpp", "adaptivecpp", "dpcpp", "dpc++"]
+namespace_prefixes = ["sycl", "cl::sycl", "hipsycl", "acpp"]
+identifier_patterns = ['SYCL_\w+', 'sycl_\w+']
+headers = ['sycl/sycl\.hpp', 'CL/sycl\.hpp', 'sycl\.hpp']
+
+[dialects.opencl]
+detect_patterns = ['\bcl[A-Z]\w+', '\bcl_\w+', '\bCL_\w+', '__kernel\b']
+aliases = ["opencl", "cl", "ocl"]
+namespace_prefixes = ["cl"]
+identifier_patterns = [
+    'cl[A-Z]\w*',              # host API: clCreateBuffer, clEnqueue..., ...
+    'cl_\w+',                  # host types: cl_int, cl_mem, cl_device_id, ...
+    'CL_\w+',                  # constants: CL_SUCCESS, CL_MEM_READ_ONLY, ...
+    'CLK_\w+',                 # kernel-side constants: CLK_LOCAL_MEM_FENCE
+    'get_(?:global|local|group|num)_\w+',
+    'u?(?:char|short|int|long)(?:2|3|4|8|16)', '(?:float|double|half)(?:2|3|4|8|16)',
+    'atomic_\w+', 'atom_\w+',
+    'convert_\w+', 'vload\w+', 'vstore\w+',
+    'mem_fence', 'read_mem_fence', 'write_mem_fence', 'work_group_barrier',
+]
+keywords = [
+    "__kernel", "kernel", "__global", "global", "__local", "local",
+    "__constant", "constant", "__private", "__read_only", "read_only",
+    "__write_only", "write_only", "__read_write", "read_write",
+    "barrier", "sampler_t", "image2d_t", "image3d_t", "event_t",
+]
+headers = ['CL/(?:cl|opencl)\w*\.h(?:pp)?', 'OpenCL/.+']
+extensions = [".cl"]
+
+[dialects.vulkan]
+detect_patterns = ['\b[Vv]k[A-Z]\w+', '\bVK_\w+']
+aliases = ["vulkan", "vk"]
+namespace_prefixes = ["vk"]
+identifier_patterns = ['vk[A-Z]\w*', 'Vk[A-Z]\w*', 'VK_\w+', 'VMA_\w+', 'Vma\w+', 'vma\w+']
+headers = ['vulkan/.+', 'vk_mem_alloc\.h']
+
+[dialects.boost_compute]
+aliases = ["boost_compute", "boost.compute", "boost::compute", "boost"]
+namespace_prefixes = ["boost::compute"]
+identifier_patterns = ['BOOST_COMPUTE_\w+']
+headers = ['boost/compute.*']
+
+[dialects.webgpu]
+detect_patterns = ['\bwgpu[A-Z]\w+', '\bWGPU\w+']
+aliases = ["webgpu", "wgpu", "dawn"]
+namespace_prefixes = ["wgpu", "dawn"]
+identifier_patterns = ['wgpu[A-Z]\w*', 'WGPU\w+']
+headers = ['webgpu/.+', 'webgpu\.h(?:pp)?', 'dawn/.+']
+
+[dialects.wgsl]
+aliases = ["wgsl"]
+identifier_patterns = [
+    'vec[234][fiuh]?', 'mat[234]x[234][fh]?', '[fiu](?:16|32)', 'u8', 'i8',
+    'atomic[A-Z]\w*',
+    'workgroup\w*', 'textureLoad', 'textureStore', 'arrayLength',
+]
+keywords = [
+    "fn", "let", "var", "ptr", "array", "storage", "uniform", "workgroup",
+    "read", "write", "read_write", "compute", "vertex", "fragment",
+    "group", "binding", "builtin", "location", "workgroup_size",
+    "global_invocation_id", "local_invocation_id", "local_invocation_index",
+    "workgroup_id", "num_workgroups", "storageBarrier", "workgroupBarrier",
+    "discard", "loop", "continuing",
+]
+punctuation = ["@", "->"]
+extensions = [".wgsl"]
+
+[dialects.glsl]
+detect_patterns = ['\bgl_\w+', '\blayout\s*\(']
+aliases = ["glsl", "opengl"]
+identifier_patterns = [
+    'gl_\w+', 'GL_\w+',
+    '[biud]?vec[234]', '[d]?mat[234](?:x[234])?',
+    '[iu]?sampler\w+', '[iu]?image\w+',
+    'local_size_[xyz]',
+    'atomic\w+', 'barrier', 'memoryBarrier\w*', 'groupMemoryBarrier',
+    'imageLoad', 'imageStore', 'texelFetch', 'texture\w*',
+    'std140', 'std430',
+]
+keywords = [
+    "layout", "buffer", "uniform", "in", "out", "inout", "shared",
+    "readonly", "writeonly", "coherent", "volatile", "restrict",
+    "binding", "set", "location", "push_constant", "flat", "smooth",
+    "precision", "highp", "mediump", "lowp", "attribute", "varying",
+    "subroutine", "invariant", "discard",
+]
+extensions = [".comp", ".glsl", ".vert", ".frag", ".geom", ".tesc", ".tese"]
+
+[dialects.slang]
+detect_patterns = ['\bSV_\w+', '\bnumthreads\b']
+aliases = ["slang", "hlsl"]
+identifier_patterns = [
+    'SV_\w+',
+    '(?:RW)?(?:Structured|Byte(?:Address)?)Buffer',
+    '(?:RW)?Texture\w+', 'SamplerState', 'SamplerComparisonState',
+    '(?:float|int|uint|bool|half|double)[1-4](?:x[1-4])?',
+    'cbuffer', 'tbuffer', 'ConstantBuffer', 'ParameterBlock',
+    'GroupMemoryBarrier\w*', 'DeviceMemoryBarrier\w*', 'AllMemoryBarrier\w*',
+    'InterlockedAdd|Interlocked\w+',
+    'WaveGetLane\w+', 'Wave\w+',
+]
+keywords = [
+    "shader", "numthreads", "groupshared", "register", "packoffset",
+    "row_major", "column_major", "globallycoherent", "in", "out", "inout",
+    "interface", "extension", "property", "associatedtype", "__generic",
+    "func", "discard",
+]
+extensions = [".slang", ".hlsl"]
+
+[dialects.metal]
+aliases = ["metal", "msl"]
+namespace_prefixes = ["metal", "MTL"]
+identifier_patterns = [
+    'MTL\w+', 'mtl\w+',
+    'thread_position_in\w*', 'threadgroup_position\w*', 'threads_per\w*',
+    'thread_index\w*', 'simdgroup\w*', 'threadgroup\w*',
+]
+keywords = ["kernel", "device", "constant", "thread", "threadgroup", "vertex", "fragment"]
+headers = ['Metal/.+', 'metal_stdlib']
+extensions = [".metal"]
+
+[dialects.stdpar]
+aliases = ["stdpar", "pstl", "parallel_stl"]
+namespace_prefixes = ["std::execution"]
+headers = ['execution']
