@@ -9,7 +9,7 @@ following matches:
 * a ``#pragma`` line starts with one of the dialect's pragma prefixes,
 * one of the dialect's namespaces is used (``Kokkos::``, also via a
   namespace alias), or
-* at least :data:`code_complexity.config.DETECTION_MIN_HITS` occurrences of
+* at least :data:`ppbcc.code_complexity.config.DETECTION_MIN_HITS` occurrences of
   the dialect's weaker ``detect_patterns`` are found.
 
 A dialect detected only via ``detect_patterns`` is suppressed when a sibling

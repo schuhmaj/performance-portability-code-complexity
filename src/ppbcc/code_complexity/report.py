@@ -11,10 +11,10 @@ from tabulate import tabulate
 #: Identifier columns always present in the report.
 ID_COLUMNS: tuple[str, ...] = ("file", "dialect")
 
-#: Line-metric columns (see :mod:`code_complexity.loc`).
+#: Line-metric columns (see :mod:`ppbcc.code_complexity.loc`).
 LOC_COLUMNS: tuple[str, ...] = ("loc", "sloc", "comment_lines", "blank_lines")
 
-#: Halstead columns (see :mod:`code_complexity.halstead`), in report order.
+#: Halstead columns (see :mod:`ppbcc.code_complexity.halstead`), in report order.
 HALSTEAD_COLUMNS: tuple[str, ...] = (
     "distinct_operators",
     "distinct_operands",

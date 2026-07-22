@@ -1,7 +1,7 @@
-"""Tests for :mod:`code_complexity.loc`."""
+"""Tests for :mod:`ppbcc.code_complexity.loc`."""
 
-from code_complexity.loc import count_lines
-from code_complexity.tokenizer import tokenize
+from ppbcc.code_complexity.loc import count_lines
+from ppbcc.code_complexity.tokenizer import tokenize
 
 
 def metrics_of(code: str):

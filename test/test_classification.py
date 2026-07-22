@@ -1,14 +1,14 @@
-"""Tests for :mod:`code_complexity.classification`."""
+"""Tests for :mod:`ppbcc.code_complexity.classification`."""
 
 import pytest
 
-from code_complexity.classification import (
+from ppbcc.code_complexity.classification import (
     TokenClassifier,
     TokenCounts,
     extract_namespace_aliases,
 )
-from code_complexity.config import load_cpp_keywords, load_dialects
-from code_complexity.tokenizer import tokenize
+from ppbcc.code_complexity.config import load_cpp_keywords, load_dialects
+from ppbcc.code_complexity.tokenizer import tokenize
 
 
 @pytest.fixture(scope="module")

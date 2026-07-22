@@ -1,10 +1,10 @@
-"""Tests for :mod:`code_complexity.evaluate` and :mod:`code_complexity.report`."""
+"""Tests for :mod:`ppbcc.code_complexity.evaluate` and :mod:`ppbcc.code_complexity.report`."""
 
 import pandas as pd
 import pytest
 
-from code_complexity.evaluate import AGGREGATE_ROW_NAME, collect_source_files, evaluate
-from code_complexity.report import format_table, report_columns, resolve_metric_columns
+from ppbcc.code_complexity.evaluate import AGGREGATE_ROW_NAME, collect_source_files, evaluate
+from ppbcc.code_complexity.report import format_table, report_columns, resolve_metric_columns
 
 CPP_CODE = """\
 #include <vector>

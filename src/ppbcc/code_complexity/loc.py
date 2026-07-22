@@ -71,7 +71,7 @@ def count_lines(code: str, tokens: list[Token]) -> LineMetrics:
     Args:
         code: Raw source text.
         tokens: Token stream of the same text, as produced by
-            :func:`code_complexity.tokenizer.tokenize`.
+            :func:`ppbcc.code_complexity.tokenizer.tokenize`.
 
     Returns:
         The :class:`LineMetrics` of the file.

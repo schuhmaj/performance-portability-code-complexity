@@ -1,6 +1,6 @@
-"""Tests for :mod:`code_complexity.tokenizer`."""
+"""Tests for :mod:`ppbcc.code_complexity.tokenizer`."""
 
-from code_complexity.tokenizer import Token, TokenKind, tokenize
+from ppbcc.code_complexity.tokenizer import Token, TokenKind, tokenize
 
 
 def kinds(tokens: list[Token]) -> list[TokenKind]:

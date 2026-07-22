@@ -1,7 +1,7 @@
 """Classification of lexer tokens into Halstead operators and operands.
 
 The classifier consumes the token stream produced by
-:mod:`code_complexity.tokenizer` and sorts every countable token into one of
+:mod:`ppbcc.code_complexity.tokenizer` and sorts every countable token into one of
 four multisets:
 
 * **operators** -- baseline C++ operators: keywords, punctuation,

@@ -1,9 +1,9 @@
-"""Tests for the command line interface (:mod:`code_complexity.__main__`)."""
+"""Tests for the code-complexity command-line interface."""
 
 import pandas as pd
 import pytest
 
-from code_complexity.__main__ import build_parser, main
+from ppbcc.code_complexity.cli import build_parser, main
 
 CODE = """\
 #pragma omp parallel for

@@ -1,7 +1,7 @@
 """Computation of the Halstead complexity measures.
 
 Given the operator/operand multisets produced by
-:mod:`code_complexity.classification`, this module derives the classic
+:mod:`ppbcc.code_complexity.classification`, this module derives the classic
 Halstead metrics (Maurice Halstead, *Elements of Software Science*, 1977):
 
 ===========================  ==================================================

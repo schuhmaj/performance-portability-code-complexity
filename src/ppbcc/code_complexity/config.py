@@ -1,7 +1,7 @@
 """Loading and representation of the analysis configuration.
 
 The configuration consists of two TOML resources shipped with the package in
-``code_complexity/share``:
+``ppbcc/code_complexity/share``:
 
 * ``cpp_keywords.toml`` -- the baseline C++ keyword sets used to distinguish
   operators from operands.
@@ -192,7 +192,7 @@ def _read_toml(default_resource: str, override: Path | None) -> dict:
 
     Args:
         default_resource: File name of the packaged resource in
-            ``code_complexity/share``.
+            ``ppbcc/code_complexity/share``.
         override: Optional path to a user-supplied TOML file replacing the
             packaged one.
 
@@ -202,7 +202,7 @@ def _read_toml(default_resource: str, override: Path | None) -> dict:
     if override is not None:
         logger.debug("Loading configuration from override file {}", override)
         return tomllib.loads(Path(override).read_text(encoding="utf-8"))
-    resource = resources.files("code_complexity") / "share" / default_resource
+    resource = resources.files("ppbcc.code_complexity") / "share" / default_resource
     logger.trace("Loading packaged configuration resource {}", default_resource)
     return tomllib.loads(resource.read_text(encoding="utf-8"))
 

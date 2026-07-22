@@ -1,4 +1,4 @@
-# Baseline C++ token classification for the Halstead analysis.
+# Baseline C++ token classification for ppbcc.code_complexity.
 #
 # `keywords` are counted as *operators*, `operand_keywords` are keywords that
 # denote values (literals / object references) and are counted as *operands*.

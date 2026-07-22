@@ -33,7 +33,7 @@ def collect_source_files(sources: list[Path]) -> list[Path]:
     Args:
         sources: Files and/or directories. Directories are searched
             recursively for files with an extension in
-            :data:`code_complexity.config.SOURCE_EXTENSIONS`; explicitly
+            :data:`ppbcc.code_complexity.config.SOURCE_EXTENSIONS`; explicitly
             listed files are taken as-is.
 
     Returns:

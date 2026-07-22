@@ -1,10 +1,10 @@
-# Conda environment for the code-complexity package.
+# Conda environment for the ppbcc package.
 #
 # Create the environment and install the package itself with:
 #   conda env create -f environment.yaml
-#   conda activate code-complexity
+#   conda activate ppbcc
 #   pip install -e .
-name: code-complexity
+name: ppbcc
 channels:
   - conda-forge
 dependencies:
@@ -12,6 +12,9 @@ dependencies:
   - pandas>=2.0           # result table handling and CSV export
   - loguru>=0.7           # logging
   - tabulate>=0.9         # pretty-printing the result table on stdout
+  - matplotlib>=3.8       # plot rendering
+  - numpy>=1.26           # numerical metric and plot processing
+  - seaborn>=0.13         # statistical plotting
   - pytest>=8.0           # running the test suite (development only)
   - pytest-xdist
   - pip

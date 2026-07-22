@@ -10,7 +10,7 @@ from the share added by a paradigm.
 
 Typical usage:
 
-    >>> from code_complexity import evaluate
+    >>> from ppbcc.code_complexity import evaluate
     >>> frame = evaluate([Path("src/")], language_dialect="kokkos",
     ...                  metrics=["halstead", "loc"], diff=True)
 """

@@ -1,11 +1,11 @@
-"""Tests for :mod:`code_complexity.halstead`."""
+"""Tests for :mod:`ppbcc.code_complexity.halstead`."""
 
 import math
 from collections import Counter
 
 import pytest
 
-from code_complexity.halstead import HalsteadMetrics
+from ppbcc.code_complexity.halstead import HalsteadMetrics
 
 
 class TestFromCounts:

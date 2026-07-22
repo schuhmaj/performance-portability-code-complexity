@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "code-complexity"
+name = "ppbcc"
 version = "0.1.0"
-description = "Halstead complexity and LOC/SLOC metrics for C++ and GPU-enriched C++ (OpenMP, OpenACC, Kokkos, RAJA, Alpaka, CUDA, HIP, SYCL, OpenCL, Vulkan, Boost.Compute, WebGPU/WGSL, GLSL, Slang, Metal)"
+description = "Performance-portability benchmarking, analysis, plotting, and code-complexity metrics"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -27,19 +27,25 @@ dependencies = [
     "pandas>=2.0",
     "loguru>=0.7",
     "tabulate>=0.9",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "seaborn>=0.13",
 ]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 
 [project.scripts]
-code-complexity = "code_complexity.__main__:main"
+ppbcc = "ppbcc.__main__:main"
+ppbcc-code-complexity = "ppbcc.__main__:code_complexity_main"
+ppbcc-p3analysis = "ppbcc.__main__:p3analysis_main"
+ppbcc-benchmark = "ppbcc.__main__:benchmark_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-code_complexity = ["share/*.toml"]
+"ppbcc.code_complexity" = ["share/*.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]

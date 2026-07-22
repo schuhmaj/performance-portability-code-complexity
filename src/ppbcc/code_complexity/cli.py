@@ -1,14 +1,14 @@
-"""Command line interface of the ``code_complexity`` package.
+"""Command-line interface for code-complexity analysis.
 
 Examples:
     Analyse a directory with automatic dialect detection and save a CSV::
 
-        python -m code_complexity path/to/src -o report.csv
+        python -m ppbcc.code_complexity path/to/src -o report.csv
 
     Force the Kokkos dialect, restrict the metrics and show the difference
     to the plain-C++ baseline::
 
-        python -m code_complexity src/kokkos -d kokkos \\
+        python -m ppbcc.code_complexity src/kokkos -d kokkos \\
             -m halstead_effort halstead_volume loc --diff -v
 """
 

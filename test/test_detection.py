@@ -1,11 +1,11 @@
-"""Tests for :mod:`code_complexity.detection`."""
+"""Tests for :mod:`ppbcc.code_complexity.detection`."""
 
 from pathlib import Path
 
 import pytest
 
-from code_complexity.config import load_dialects
-from code_complexity.detection import detect_dialects, extract_includes
+from ppbcc.code_complexity.config import load_dialects
+from ppbcc.code_complexity.detection import detect_dialects, extract_includes
 
 
 @pytest.fixture(scope="module")
