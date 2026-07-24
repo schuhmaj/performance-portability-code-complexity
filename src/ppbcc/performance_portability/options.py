@@ -127,6 +127,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Keep results with this floating-point precision.",
     )
     metrics.add_argument(
+        "-H",
+        "--hardware",
+        help=(
+            "Only include results from this hardware in a boxplot. This option "
+            "is invalid for all other chart types."
+        ),
+    )
+    metrics.add_argument(
         "--non-zero-pp",
         action="store_true",
         help=(

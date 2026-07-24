@@ -2,6 +2,7 @@
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import pytest
 
 from ppbcc.constants import (
     APPLICATION,
@@ -146,3 +147,48 @@ def test_boxplot_all_retains_every_selected_size(tmp_path, monkeypatch):
     assert set(captured["efficiency"][APPLICATION]) == {
         "Kokkos[Portable]",
     }
+
+
+def test_boxplot_hardware_filter_retains_only_requested_hardware(
+    tmp_path, monkeypatch
+):
+    csv_path = tmp_path / "benchmarks.csv"
+    _write_benchmarks(csv_path)
+    captured = {}
+
+    def fake_boxplot(efficiency, problem_title, **kwargs):
+        captured["efficiency"] = efficiency.copy()
+        return plt.figure()
+
+    monkeypatch.setattr(cli, "plot_efficiency_boxplot", fake_boxplot)
+    monkeypatch.setattr(cli, "save_figure", lambda figure, output: plt.close(figure))
+
+    result = cli.main(
+        [
+            "NBody",
+            str(csv_path),
+            "--chart",
+            "boxplot",
+            "-H",
+            "AMD MI250",
+        ]
+    )
+
+    assert result == 0
+    assert set(captured["efficiency"][HARDWARE]) == {"AMD MI250"}
+
+
+@pytest.mark.parametrize("chart", ["cascade", "navchart", "combined", "heatmap"])
+def test_hardware_filter_is_rejected_for_non_boxplot_charts(chart, tmp_path):
+    result = cli.main(
+        [
+            "NBody",
+            str(tmp_path / "unused.csv"),
+            "--chart",
+            chart,
+            "--hardware",
+            "AMD MI250",
+        ]
+    )
+
+    assert result == 1

@@ -51,7 +51,8 @@ ppbcc code-complexity path/to/src -o complexity.csv
 ppbcc benchmark -b path/to/build -p . -r '.*nbody.*' -H RTX5080 -o results
 ppbcc p3analysis NBody results.csv --chart cascade -o nbody.pdf
 ppbcc p3analysis NBody results.csv --chart heatmap --size all -o efficiency.pdf
-ppbcc p3analysis NBody results.csv --chart boxplot --size 1048576 -o spread.pdf
+ppbcc p3analysis NBody results.csv --chart boxplot --size 1048576 \
+  --hardware "NVIDIA H100" -o spread.pdf
 ```
 
 Each workflow also has standalone compatibility and prefixed executables:
@@ -68,7 +69,9 @@ supports Cascade, Navchart, combined, heatmap, and boxplot charts, plus CSV
 export of application-efficiency and performance-portability data. The
 heatmap places paradigms on the x-axis and platforms on the y-axis. The
 boxplot shows each paradigm's application-efficiency distribution across
-platforms and sizes.
+platforms and sizes, with paradigms sorted alphabetically. Pass
+`-H/--hardware` to restrict a boxplot to one hardware platform; this option is
+an error for every other chart type.
 
 P3 analysis uses `--size all` by default. An exact numeric size restricts all
 charts to that size. Cascade, Navchart, combined, and heatmap charts also

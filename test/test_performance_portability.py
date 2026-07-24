@@ -84,6 +84,15 @@ def test_size_all_is_supported_and_is_the_default():
     assert args.size == ALL_SIZE
 
 
+@pytest.mark.parametrize("flag", ["-H", "--hardware"])
+def test_hardware_option_supports_short_and_long_flags(flag):
+    args = build_parser().parse_args(
+        ["NBody", "results.csv", "--chart", "boxplot", flag, "AMD MI250"]
+    )
+
+    assert args.hardware == "AMD MI250"
+
+
 @pytest.mark.parametrize("literal", ["mean", "average", "best", "worst"])
 def test_boxplot_rejects_summary_size_literals(literal, tmp_path):
     from ppbcc.performance_portability.cli import main

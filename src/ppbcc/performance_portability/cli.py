@@ -71,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
     sns.set_theme(style="whitegrid", context="talk", font="DejaVu Sans")
 
     try:
+        if args.hardware is not None and args.chart != "boxplot":
+            raise ValueError("--hardware is only valid for boxplot charts.")
         if args.chart in {"navchart", "combined"} and args.complexity is None:
             raise ValueError(f"--chart {args.chart} requires --complexity.")
         if args.chart == "boxplot" and args.size in {
@@ -161,8 +163,22 @@ def main(argv: list[str] | None = None) -> int:
             portability_frames.append(problem_portability)
 
             if args.chart == "boxplot":
+                boxplot_rows = selected
+                if args.hardware is not None:
+                    hardware_labels = selected[HARDWARE].astype(str)
+                    hardware_mask = hardware_labels.eq(args.hardware)
+                    if not hardware_mask.any():
+                        available_hardware = sorted(
+                            hardware_labels.unique(), key=str.casefold
+                        )
+                        raise ValueError(
+                            f"Hardware {args.hardware!r} has no selected rows for "
+                            f"{resolved_problem}. Available hardware: "
+                            f"{available_hardware}"
+                        )
+                    boxplot_rows = selected.loc[hardware_mask].copy()
                 boxplot_efficiency, _ = calculate_metrics_by_size(
-                    selected,
+                    boxplot_rows,
                     description_is_workload,
                     non_zero_pp=args.non_zero_pp,
                 )
@@ -329,15 +345,11 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.chart == "boxplot":
             boxplot_efficiency = pd.concat(boxplot_efficiency_frames, ignore_index=True)
-            application_order = portability.sort_values(
-                PERFORMANCE_PORTABILITY, ascending=False
-            )[APPLICATION].astype(str)
             figure = plot_efficiency_boxplot(
                 boxplot_efficiency,
                 problem_title,
                 remove_description=args.remove_description,
                 selected_size=args.size,
-                application_order=application_order,
             )
         else:
             figure = plot_cascade(

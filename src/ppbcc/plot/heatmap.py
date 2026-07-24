@@ -128,7 +128,8 @@ def plot_efficiency_boxplot(
         problem_title: Benchmark problem shown in the title.
         remove_description: Whether to hide bracketed implementation details.
         selected_size: ``all`` or an exact numeric problem size.
-        application_order: Optional paradigm order, normally descending PP.
+        application_order: Retained for API compatibility. Boxplots always
+            sort paradigms alphabetically.
 
     Returns:
         Matplotlib figure containing paradigm-colored boxplots and observations.
@@ -139,6 +140,7 @@ def plot_efficiency_boxplot(
     if efficiency.empty:
         raise ValueError("No application-efficiency data available for boxplot.")
 
+    del application_order
     plot_data = efficiency.copy()
     if remove_description:
         plot_data[APPLICATION] = (
@@ -147,12 +149,7 @@ def plot_efficiency_boxplot(
             .map(lambda application: _display_application(application, True))
         )
     present = set(plot_data[APPLICATION].astype(str))
-    requested_order = () if application_order is None else application_order
-    requested_labels = [
-        _display_application(str(item), remove_description) for item in requested_order
-    ]
-    order = list(dict.fromkeys(item for item in requested_labels if item in present))
-    order.extend(sorted(present - set(order), key=str.casefold))
+    order = sorted(present, key=lambda item: (item.casefold(), item))
     colors = _framework_colors(order)
 
     width = max(9.0, 3.0 + 1.15 * len(order))
