@@ -33,6 +33,8 @@ from ppbcc.plot.styles import (
     _problem_markers,
 )
 
+PLATFORM_ROW_START_X = 0.35
+
 
 def plot_cascade(
     efficiency: pd.DataFrame,
@@ -161,6 +163,22 @@ def plot_cascade(
             markeredgewidth=1.5,
             linewidth=1.2,
             zorder=1,
+        )
+        # Draw the row's start just outside the table so its paradigm color is
+        # visible even when platform rectangles cover the entire row. Keep the
+        # existing row line unchanged so its right endpoint retains its current
+        # appearance for applications that do not support every platform.
+        platform_axis.plot(
+            [PLATFORM_ROW_START_X, 0.5],
+            [y + 0.5, y + 0.5],
+            color=colors[application],
+            marker=markers[problem],
+            markevery=[0],
+            markersize=PLOT_MARKER_SIZE,
+            markeredgewidth=1.5,
+            linewidth=1.2,
+            clip_on=False,
+            zorder=3,
         )
         for rank, platform in enumerate(rows[HARDWARE], start=1):
             platform_axis.add_patch(
