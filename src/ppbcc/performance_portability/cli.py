@@ -73,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.hardware is not None and args.chart != "boxplot":
             raise ValueError("--hardware is only valid for boxplot charts.")
+        if args.legend_vertical and not args.legend:
+            raise ValueError("--legend--vertical requires -l/--legend.")
         if args.chart in {"navchart", "combined"} and args.complexity is None:
             raise ValueError(f"--chart {args.chart} requires --complexity.")
         if args.chart == "boxplot" and args.size in {
@@ -410,6 +412,7 @@ def main(argv: list[str] | None = None) -> int:
                 problems,
                 sorted(efficiency[HARDWARE].astype(str).unique()),
                 remove_description=args.remove_description,
+                vertical=args.legend_vertical,
             )
             legend_output = output.with_name(f"{output.stem}_legend.pdf")
             save_figure(legend_figure, legend_output)

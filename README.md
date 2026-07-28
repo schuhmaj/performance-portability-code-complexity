@@ -77,6 +77,8 @@ P3 analysis uses `--size all` by default. An exact numeric size restricts all
 charts to that size. Cascade, Navchart, combined, and heatmap charts also
 accept `average`/`mean`, `best`, and `worst`; boxplots require `all` or an
 exact numeric size because summary modes remove the underlying distribution.
+Use `-l/--legend` to save the chart legend as a separate PDF, and add
+`--legend--vertical` to arrange its device and paradigm entries in one column.
 
 ## Command line usage
 

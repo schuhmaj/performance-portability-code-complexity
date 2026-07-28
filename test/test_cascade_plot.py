@@ -14,7 +14,11 @@ from ppbcc.constants import (
     PERFORMANCE_PORTABILITY,
     PROBLEM,
 )
-from ppbcc.plot.cascade import PLATFORM_ROW_START_X, plot_cascade
+from ppbcc.plot.cascade import (
+    HARDWARE_CELL_FONT_SIZE,
+    PLATFORM_ROW_START_X,
+    plot_cascade,
+)
 
 
 def test_platform_rows_have_visible_start_marker_without_changing_endpoint():
@@ -46,4 +50,8 @@ def test_platform_rows_have_visible_start_marker_without_changing_endpoint():
     assert start_line.get_marker() == "o"
     assert start_line.get_markevery() == [0]
     assert start_line.get_clip_on() is False
+    assert {text.get_fontsize() for text in platform_axis.texts} == {
+        HARDWARE_CELL_FONT_SIZE
+    }
+    assert HARDWARE_CELL_FONT_SIZE > 8
     plt.close(figure)

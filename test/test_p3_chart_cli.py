@@ -192,3 +192,21 @@ def test_hardware_filter_is_rejected_for_non_boxplot_charts(chart, tmp_path):
     )
 
     assert result == 1
+
+
+def test_vertical_legend_requires_separate_legend(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "load_benchmark_csvs",
+        lambda paths: pytest.fail("input should not be loaded"),
+    )
+
+    result = cli.main(
+        [
+            "NBody",
+            str(tmp_path / "unused.csv"),
+            "--legend--vertical",
+        ]
+    )
+
+    assert result == 1

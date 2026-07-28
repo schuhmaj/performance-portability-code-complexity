@@ -77,7 +77,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Omit legends from the plot and save them as a separate PDF with "
-            "four columns."
+            "four columns by default."
+        ),
+    )
+    general.add_argument(
+        "--legend--vertical",
+        dest="legend_vertical",
+        action="store_true",
+        help=(
+            "Arrange entries in the separate legend in one column. Requires "
+            "-l/--legend."
         ),
     )
     general.add_argument(

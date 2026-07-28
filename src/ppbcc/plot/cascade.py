@@ -34,6 +34,7 @@ from ppbcc.plot.styles import (
 )
 
 PLATFORM_ROW_START_X = 0.35
+HARDWARE_CELL_FONT_SIZE = 11
 
 
 def plot_cascade(
@@ -198,7 +199,7 @@ def plot_cascade(
                 platform_labels[platform],
                 ha="center",
                 va="center",
-                fontsize=8,
+                fontsize=HARDWARE_CELL_FONT_SIZE,
                 zorder=3,
             )
     platform_axis.set_xlabel("Platform rank (highest efficiency first)")

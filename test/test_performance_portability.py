@@ -93,6 +93,15 @@ def test_hardware_option_supports_short_and_long_flags(flag):
     assert args.hardware == "AMD MI250"
 
 
+def test_vertical_legend_option_is_parsed():
+    args = build_parser().parse_args(
+        ["NBody", "results.csv", "-l", "--legend--vertical"]
+    )
+
+    assert args.legend is True
+    assert args.legend_vertical is True
+
+
 @pytest.mark.parametrize("literal", ["mean", "average", "best", "worst"])
 def test_boxplot_rejects_summary_size_literals(literal, tmp_path):
     from ppbcc.performance_portability.cli import main

@@ -262,17 +262,21 @@ def create_separate_legend(
     problems: list[str],
     platforms: list[str],
     remove_description: bool = False,
+    vertical: bool = False,
 ) -> plt.Figure:
-    """Create a standalone four-column paradigm/device legend.
+    """Create a standalone paradigm/device legend.
 
     Paradigms are placed at the top and devices at the bottom. A problem-marker
-    section is included between them when more than one problem is plotted.
+    section is included between them when more than one problem is plotted. By
+    default each section is a separate four-column legend; vertical mode
+    combines the sections into one single-column legend with subheadings.
 
     Args:
         applications: Application labels in display order.
         problems: Problem names in display order.
         platforms: Hardware labels in display order.
         remove_description: Whether bracketed descriptions are hidden.
+        vertical: Whether legend entries are arranged in one column.
 
     Returns:
         A standalone legend figure.
@@ -295,6 +299,40 @@ def create_separate_legend(
         )
         for name in platforms
     ]
+
+    if vertical:
+        sections = [("Paradigm", paradigm_handles)]
+        if len(problems) > 1:
+            sections.append(
+                (
+                    "Problem",
+                    _problem_legend_handles(problems, markers),
+                )
+            )
+        sections.append(("Device", device_handles))
+
+        grouped_handles = []
+        heading_indexes = []
+        for heading, handles in sections:
+            heading_indexes.append(len(grouped_handles))
+            grouped_handles.append(
+                Line2D([], [], linestyle="None", marker=None, label=heading)
+            )
+            grouped_handles.extend(handles)
+
+        height = max(2.0, 0.42 * len(grouped_handles) + 0.5)
+        figure = plt.figure(figsize=(6.5, height))
+        legend = figure.legend(
+            handles=grouped_handles,
+            loc="center",
+            ncol=1,
+            frameon=True,
+            labelspacing=0.45,
+        )
+        legend_texts = legend.get_texts()
+        for index in heading_indexes:
+            legend_texts[index].set_fontweight("bold")
+        return figure
 
     paradigm_rows = max(1, (len(paradigm_handles) + 3) // 4)
     device_rows = max(1, (len(device_handles) + 3) // 4)
