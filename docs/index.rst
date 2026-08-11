@@ -26,10 +26,22 @@ This package provides three workflows:
   performance portability, and five chart types that relate both to code
   complexity.
 
-The performance-portability metrics and the Cascade/Navchart layouts follow —
-and are inspired by — the
-`P3 Analysis Library <https://github.com/P3HPC/p3-analysis-library>`__ by the
-P3HPC community.
+Credits
+-------
+
+The performance-portability metrics and the Cascade/Navchart layouts are
+inspired by the
+`P3 Analysis Library <https://github.com/P3HPC/p3-analysis-library>`__ by
+Pennycook et al. If you use this tool, please also have a look at their
+performance-portability analysis in published work, as this work builds upon
+theirs.
+
+``ppbcc`` rests on two bodies of work:
+
+* **Code complexity** — Halstead's software science [Halstead1977]_, the basis
+  of :doc:`usage/code_complexity`.
+* **Performance portability** — the :math:`\Phi` metric and its visualizations
+  [Pennycook2019]_ [Pennycook2021]_, the basis of :doc:`usage/p3analysis`.
 
 .. toctree::
    :caption: INSTALLATION & QUICK START

@@ -8,6 +8,11 @@ CSV) into application-efficiency and performance-portability figures, then
 renders them as one of five charts. The chart gallery lives in :doc:`plots`;
 this page covers the metrics and the data selection behind them.
 
+The metrics implemented here are those of Pennycook et al. [Pennycook2019]_
+[Pennycook2021]_, and the Cascade and Navchart layouts follow the
+`P3 Analysis Library <https://github.com/P3HPC/p3-analysis-library>`__ that
+accompanies that work. See :ref:`p3analysis-references`.
+
 .. code-block:: bash
 
     ppbcc p3analysis NAME CSV [CSV ...] [options]
@@ -36,24 +41,26 @@ Performance portability :math:`\Phi`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :math:`\Phi` is the harmonic mean of the application efficiencies over the set
-of platforms :math:`H`:
+of platforms :math:`H` [Pennycook2019]_:
 
 .. math::
 
     \Phi(a, H) = \frac{|H|}{\sum_{p \in H} \frac{1}{e_A(a, p)}}
 
 By default, a platform an implementation does not support contributes zero and
-therefore drives :math:`\Phi` to zero — the strict reading, which rewards
-implementations that run everywhere. ``--non-zero-pp`` restricts the harmonic
-mean to the platforms that actually produced a result; the
-application-efficiency output still retains the zeros, so the heatmap and the
-Cascade platform ranking stay honest about the gaps.
+therefore drives :math:`\Phi` to zero — the strict reading of the original
+definition, which rewards implementations that run everywhere.
+``--non-zero-pp`` restricts the harmonic mean to the platforms that actually
+produced a result; the application-efficiency output still retains the zeros,
+so the heatmap and the Cascade platform ranking stay honest about the gaps.
 
 .. note::
 
-    Both definitions and the Cascade/Navchart layouts follow the
-    `P3 Analysis Library <https://github.com/P3HPC/p3-analysis-library>`__,
-    which inspired this part of ``ppbcc``.
+    Reporting :math:`\Phi` without naming the platform set :math:`H` is
+    meaningless — the same implementation scores very differently over
+    "all NVIDIA GPUs" than over "every platform measured". Whenever you quote a
+    number from these charts, quote the platform set and whether
+    ``--non-zero-pp`` was used along with it.
 
 Selecting data
 --------------
@@ -178,3 +185,29 @@ Python API
     )
 
 See :doc:`../api/performance_portability` for the full signatures.
+
+.. _p3analysis-references:
+
+References
+----------
+
+The :math:`\Phi` metric implemented here was introduced in [Pennycook2019]_;
+the Cascade and Navchart visualizations, and the productivity dimension they
+add, come from [Pennycook2021]_. Both are the work behind the
+`P3 Analysis Library <https://github.com/P3HPC/p3-analysis-library>`__, which
+inspired this part of ``ppbcc`` — please have a look at it, and cite the papers
+below rather than this tool when you report performance-portability results.
+
+.. [Pennycook2019] S. J. Pennycook, J. D. Sewall, and V. W. Lee, "Implications
+   of a Metric for Performance Portability," *Future Generation Computer
+   Systems*, vol. 92, pp. 947–958, Mar. 2019,
+   doi: `10.1016/j.future.2017.08.007 <https://doi.org/10.1016/j.future.2017.08.007>`__.
+
+.. [Pennycook2021] S. J. Pennycook, J. D. Sewall, D. W. Jacobsen, T. Deakin,
+   and S. McIntosh-Smith, "Navigating Performance, Portability, and
+   Productivity," *Computing in Science & Engineering*, vol. 23, no. 5,
+   pp. 28–38, Sep. 2021,
+   doi: `10.1109/MCSE.2021.3097276 <https://doi.org/10.1109/MCSE.2021.3097276>`__.
+
+The complexity axis of the Navchart rests on a separate body of work; see
+:ref:`code-complexity-references`.

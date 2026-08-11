@@ -78,9 +78,12 @@ mean to the platforms an implementation actually supports.
 
 .. note::
 
-    These definitions and the Cascade/Navchart layouts follow the
-    `P3 Analysis Library <https://github.com/P3HPC/p3-analysis-library>`__,
-    which inspired this part of ``ppbcc``.
+    These definitions are those of Pennycook et al. [Pennycook2019]_
+    [Pennycook2021]_, and the Cascade/Navchart layouts follow the
+    `P3 Analysis Library <https://github.com/P3HPC/p3-analysis-library>`__ that
+    accompanies that work, which inspired this part of ``ppbcc``. The Halstead
+    measures come from [Halstead1977]_. Full citations:
+    :ref:`p3analysis-references` and :ref:`code-complexity-references`.
 
 Supported dialects
 ------------------

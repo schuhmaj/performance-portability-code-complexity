@@ -3,9 +3,14 @@
 Code Complexity
 ===============
 
-The code-complexity workflow computes the classic Halstead measures (volume,
-difficulty, effort, language level, ...) and line-based size metrics for a set
-of C++ and GPU source files. Its distinguishing feature is that it understands
+The code-complexity workflow computes the classic Halstead measures
+[Halstead1977]_ (volume, difficulty, effort, language level, ...) and
+line-based size metrics for a set of C++ and GPU source files. All formulas
+follow Halstead's original definitions; see :ref:`code-complexity-references`
+for the source and :ref:`code-complexity-metric-definitions` for the concrete
+expressions used here.
+
+Its distinguishing feature is that it understands
 the constructs of GPU/parallel programming paradigms and counts them as
 **dialect operators**, so you can quantify how much syntactic surface a
 paradigm adds on top of the plain C++ baseline.
@@ -77,6 +82,66 @@ Python API
     print(frame[["file", "dialect", "effort", "delta_effort"]])
 
 The result is a :class:`pandas.DataFrame` with one row per file.
+
+.. _code-complexity-metric-definitions:
+
+Halstead metric definitions
+---------------------------
+
+Let :math:`n_1` and :math:`n_2` be the number of *distinct* operators and
+operands, and :math:`N_1` and :math:`N_2` their total number of occurrences.
+``ppbcc`` derives Halstead's measures [Halstead1977]_ exactly as originally
+defined:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 33 33
+
+   * - Measure
+     - Formula
+     - Column
+   * - Vocabulary :math:`\eta`
+     - :math:`n_1 + n_2`
+     - ``vocabulary``
+   * - Length :math:`N`
+     - :math:`N_1 + N_2`
+     - ``length``
+   * - Calculated length :math:`\hat{N}`
+     - :math:`n_1 \log_2 n_1 + n_2 \log_2 n_2`
+     - ``calculated_length``
+   * - Volume :math:`V`
+     - :math:`N \log_2 \eta`
+     - ``volume``
+   * - Difficulty :math:`D`
+     - :math:`\frac{n_1}{2} \cdot \frac{N_2}{n_2}`
+     - ``difficulty``
+   * - Effort :math:`E`
+     - :math:`D \cdot V`
+     - ``effort``
+   * - Time :math:`T`
+     - :math:`E / 18` seconds
+     - ``time_seconds``
+   * - Delivered bugs :math:`B`
+     - :math:`V / 3000`
+     - ``delivered_bugs``
+   * - Program level :math:`L`
+     - :math:`1 / D`
+     - ``program_level``
+   * - Language level :math:`\lambda`
+     - :math:`L^2 \cdot V`
+     - ``language_level``
+
+Degenerate inputs are handled defensively: an empty vocabulary yields a volume
+of zero, and a program without operands yields a difficulty — and therefore a
+program level — of zero rather than a division by zero.
+
+.. note::
+
+    :math:`T = E/18` and :math:`B = V/3000` carry Halstead's original empirical
+    constants (the Stroud number and the bug-rate estimate). They are reported
+    for completeness; for comparing paradigms, prefer ``volume``,
+    ``difficulty``, or ``effort``, which are what the
+    :doc:`Navchart and combined charts <plots>` consume.
 
 Result columns
 --------------
@@ -261,3 +326,15 @@ Run it with:
 
 The resulting ``results/code-complexity/code-complexity.csv`` is exactly the
 file passed to ``ppbcc p3analysis --complexity`` in :doc:`plots`.
+
+.. _code-complexity-references:
+
+References
+----------
+
+.. [Halstead1977] M. H. Halstead, *Elements of Software Science*, in Operating
+   and Programming Systems Series. USA: Elsevier Science Inc., 1977.
+   `Catalogue entry <https://search.ub.tum.de/vufind/Record/DE-604.BV002283430>`__.
+
+The performance-portability side of ``ppbcc`` builds on a separate body of
+work; see :ref:`p3analysis-references`.
