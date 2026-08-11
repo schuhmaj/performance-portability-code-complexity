@@ -1,17 +1,36 @@
 # ppbcc
 
-Performance-portability benchmarking, P3 analysis/plotting, and Halstead
-complexity analysis for **C++** and **GPU-enriched C++**.
+**P**erformance-**p**ortability **b**enchmarking, analysis, plotting, and
+**c**ode **c**omplexity for **C++** and **GPU-enriched C++**.
+
+This repository is the tooling half of a performance-portability study of GPU
+programming paradigms. The code under study — the same four algorithms (vector
+addition, matrix multiplication, an n-body simulation, and a polyhedral gravity
+model) implemented across CUDA, HIP, SYCL, Kokkos, RAJA, Alpaka, OpenMP,
+OpenACC, OpenCL, Vulkan, Boost.Compute, WebGPU, Slang, Metal, and Stdpar —
+lives in the companion repository
+[**performance-portability-benchmark**](https://github.com/schuhmaj/performance-portability-benchmark),
+together with the measurement results in its `results/` folder.
+
+`ppbcc` provides the utilities on top of that: running the benchmarks,
+computing application efficiency and performance portability, plotting the
+results, and measuring code complexity. **The code-complexity analysis is
+stand-alone** — it needs nothing but the source files you point it at, so it is
+useful for any C++/GPU codebase.
+
+📖 **[Documentation](https://schuhmaj.github.io/performance-portability-code-complexity/)**
+ · 🖼️ **[Example plots](examples/)**
 
 The package is split into four focused areas:
 
-- `ppbcc.benchmark` discovers and runs Google Benchmark executables and
+- `ppbcc.code_complexity` — Halstead and LOC/SLOC analysis with dialect-aware
+  token counting (**stand-alone**).
+- `ppbcc.benchmark` — discovers and runs Google Benchmark executables and
   consolidates their JSON reports into tidy CSV data.
-- `ppbcc.performance_portability` loads benchmark CSVs and calculates
+- `ppbcc.performance_portability` — loads benchmark CSVs and calculates
   application efficiency and performance portability.
-- `ppbcc.plot` contains Cascade, Navchart, combined, application-efficiency
-  heatmap, and boxplot visualizations.
-- `ppbcc.code_complexity` provides the original Halstead and LOC/SLOC analysis.
+- `ppbcc.plot` — Cascade, Navchart, combined, application-efficiency heatmap,
+  and boxplot visualizations.
 
 The tool computes the classic Halstead measures (volume, difficulty, effort,
 language level, ...) and line-based size metrics for a set of C++ source
@@ -25,6 +44,14 @@ Thrust, pCUDA ([AdaptiveCpp's portable CUDA dialect](https://github.com/Adaptive
 SYCL (AdaptiveCpp/DPC++), OpenCL (host API and `.cl` kernels), Vulkan,
 Boost.Compute, WebGPU (host API and WGSL), GLSL compute shaders, Slang/HLSL,
 Metal, stdpar** (`std::execution`).
+
+## Credits
+
+The performance-portability metrics and the Cascade/Navchart layouts are
+inspired by the
+[**P3 Analysis Library**](https://github.com/P3HPC/p3-analysis-library) by Pennycook et al.
+If you use this tool, please also have a look at their performance-portability analysis in published work,
+as this work builds upon theirs.
 
 ## Installation
 
@@ -42,79 +69,99 @@ pip install -e .
 
 Requires Python >= 3.12.
 
-## Unified command line
+## Command line
 
-The `ppbcc` executable exposes all three workflows as subcommands:
+Everything is reachable through the single `ppbcc` executable:
 
 ```bash
 ppbcc code-complexity path/to/src -o complexity.csv
 ppbcc benchmark -b path/to/build -p . -r '.*nbody.*' -H RTX5080 -o results
 ppbcc p3analysis NBody results.csv --chart cascade -o nbody.pdf
-ppbcc p3analysis NBody results.csv --chart heatmap --size all -o efficiency.pdf
-ppbcc p3analysis NBody results.csv --chart boxplot --size 1048576 \
-  --hardware "NVIDIA H100" -o spread.pdf
 ```
 
-Each workflow also has standalone compatibility and prefixed executables:
+Each command is also installed as a prefixed executable
+(`ppbcc-code-complexity`, `ppbcc-benchmark`, `ppbcc-p3analysis`), and the
+package can be run as a module: `python -m ppbcc code-complexity src/`.
 
-| Workflow | Executables |
-| --- | --- |
-| Code complexity | `code-complexity`, `ppbcc-code-complexity` |
-| Benchmark | `benchmark`, `ppbcc-benchmark` |
-| P3 analysis | `p3analysis`, `ppbcc-p3analysis` |
+> [!TIP]
+> The tables below list the options you reach for most often, not every option.
+> Run `ppbcc <command> --help` (or `-h`) for the exhaustive, always-current list.
 
-Run any command with `--help` for its complete options. The benchmark command
-supports `--skip-benchmark` to consolidate existing JSON reports. P3 analysis
-supports Cascade, Navchart, combined, heatmap, and boxplot charts, plus CSV
-export of application-efficiency and performance-portability data. The
-heatmap places paradigms on the x-axis and platforms on the y-axis. The
-boxplot shows each paradigm's application-efficiency distribution across
-platforms and sizes, with paradigms sorted alphabetically. Pass
-`-H/--hardware` to restrict a boxplot to one hardware platform; this option is
-an error for every other chart type.
+### `ppbcc code-complexity`
 
-P3 analysis uses `--size all` by default. An exact numeric size restricts all
-charts to that size. Cascade, Navchart, combined, and heatmap charts also
-accept `average`/`mean`, `best`, and `worst`; boxplots require `all` or an
-exact numeric size because summary modes remove the underlying distribution.
-Use `-l/--legend` to save the chart legend as a separate PDF, and add
-`--legend--vertical` to arrange its device and paradigm entries in one column.
-
-## Command line usage
-
-```bash
-# Analyse a directory recursively, auto-detect the dialect of every file,
-# print the table and save it as CSV:
-code-complexity path/to/src -o report.csv
-
-# Equivalent grouped module invocation:
-python -m ppbcc code-complexity path/to/src -o report.csv
-
-# Force a dialect (several may be combined), restrict the metrics, and
-# additionally report the plain-C++ baseline and the paradigm's delta:
-code-complexity src/kokkos -d kokkos -m halstead loc --diff -o kokkos.csv
-
-# Aggregate all files into an additional TOTAL row:
-code-complexity src/cuda -d cuda --aggregate
-
-# More logging: -v (DEBUG), -vv (TRACE); default level is INFO.
-code-complexity src -vv
-
-# List all known dialects and their aliases:
-code-complexity --list-dialects
-```
-
-Important options:
+Halstead complexity and LOC/SLOC metrics for C++ and GPU-enriched C++.
 
 | Option | Meaning |
 | --- | --- |
 | `sources` | Files and/or directories (searched recursively for C++/kernel/shader extensions) |
-| `-d, --dialect` | `auto` (default, per-file detection), `cpp` (baseline only), or dialect names such as `kokkos`, `cuda`, `opencl`, `kokkos,openmp` |
-| `-m, --metrics` | Metric selection, e.g. `halstead`, `loc`, `sloc`, `halstead_effort`, `halstead_volume`, `dialect` (default: all) |
-| `--diff` | Adds `baseline_*` / `delta_*` columns: metrics of the code with all dialect tokens removed, and the difference of the full metrics against that baseline |
+| `-d, --dialect` | `auto` (default, per-file detection), `cpp` (baseline only), or dialect names such as `kokkos`, `cuda`, `kokkos,openmp` |
+| `-m, --metrics` | Metric selection, e.g. `halstead`, `loc`, `sloc`, `dialect` (default: all) |
+| `--diff` | Adds `baseline_*`/`delta_*` columns: metrics of the code with all dialect tokens removed, and the difference against that baseline |
 | `--aggregate` | Appends a `TOTAL` row (operator/operand sets are merged before recomputing, so distinct counts are project-wide) |
 | `-o, --output` | CSV output path (`--csv-separator` changes the separator) |
-| `--keywords-config`, `--dialects-config` | Override the packaged TOML configuration |
+| `--list-dialects` | List all known dialects and their aliases, then exit |
+
+```bash
+# Auto-detect the dialect of every file, print the table and save it as CSV
+ppbcc code-complexity path/to/src -o report.csv
+
+# Force a dialect, restrict the metrics, and report the plain-C++ delta
+ppbcc code-complexity src/kokkos -d kokkos -m halstead loc --diff -o kokkos.csv
+```
+
+### `ppbcc benchmark`
+
+Runs Google Benchmark targets and consolidates their JSON reports into one CSV.
+
+| Option | Meaning |
+| --- | --- |
+| `-b, --build-dir` | Build folder used as the working directory for the whole pipeline |
+| `-p, --path` | Directories searched recursively, relative to `--build-dir` |
+| `-r, --regex` | **Required.** Pattern(s) matched against file paths to select executables (or reports) |
+| `-x, --exclude` | Pattern(s) excluding matched paths, e.g. `'.*_cpp'` |
+| `-s, --skip-benchmark` | Run nothing; locate existing JSON reports and only consolidate them |
+| `-n, --dry-run` | List the matched executables (or reports) and exit |
+| `-H, --hardware` | Value stored in the `Hardware` column, e.g. `"NVIDIA RTX5080"` |
+| `-o, --output` | Base name of the consolidated CSV (defaults to a timestamped name) |
+
+```bash
+ppbcc benchmark -p src -H "NVIDIA RTX5080" -r "vec_.*" "nbody_.*" -x ".*_cpp" --dry-run
+```
+
+### `ppbcc p3analysis`
+
+Application efficiency, performance portability, and plots from benchmark CSVs.
+
+| Option | Meaning |
+| --- | --- |
+| `NAME` | Benchmark problem to plot; exact case-insensitive match preferred, unique substring accepted |
+| `CSV` | One or more CSVs produced by `ppbcc benchmark` |
+| `-c, --chart` | `cascade` (default), `navchart`, `combined`, `heatmap`, `boxplot` |
+| `--complexity` | Code-complexity CSV; **required** for `navchart` and `combined` |
+| `--complexity-metric` | SLOC, Halstead vocabulary/length/volume/difficulty/effort (default: `halstead-effort`) |
+| `--normalize` / `--additive` | Divide by, or subtract, the plain-C++ complexity score (mutually exclusive) |
+| `-s, --size` | `all` (default), an exact size, or `avg`/`best`/`worst` |
+| `--non-zero-pp` | Calculate Φ over supported platforms only |
+| `-x, --exclude` / `-i, --include` | Regex filters on the `Description` column |
+| `--remove-description` | Drop bracketed labels such as `[Naive]`; efficiency charts combine variants by paradigm |
+| `-l, --legend` | Save the legend as a separate PDF (`--legend--vertical` for one column) |
+| `-e, --export-to-csv` | Also export efficiency and portability data as CSV |
+| `-o, --output` | Output path; defaults to `<problem>_<chart>.pdf` |
+
+```bash
+ppbcc p3analysis MatrixMultiplication ./Results_* \
+  --complexity ./code-complexity/code-complexity.csv -c combined \
+  --complexity-metric halstead-difficulty --additive --log-size \
+  --non-zero-pp --remove-description -s avg -x "Cublas"
+```
+
+Not every option applies to every chart, and invalid combinations are rejected
+rather than silently ignored: `--complexity` affects only `navchart`/`combined`,
+`--normalize`/`--additive` require one of those two together with
+`--complexity`, `--log-size` is `combined`-only, `-H/--hardware` is
+`boxplot`-only, and `boxplot` needs `-s all` or an exact numeric size.
+See [`examples/`](examples/) for one rendered example of every chart together
+with the exact command that produced it.
 
 ## Python API
 
@@ -146,6 +193,11 @@ The result is a `pandas.DataFrame` with one row per file. Columns include:
   contributed by the GPU paradigm
 * with `diff=True`: `baseline_<metric>` and `delta_<metric>` for the key
   Halstead columns
+
+A worked example that analyses a whole benchmark suite implementation by
+implementation is documented in the
+[Code Complexity](https://schuhmaj.github.io/performance-portability-code-complexity/usage/code_complexity.html)
+section.
 
 ## How tokens are counted
 
@@ -179,5 +231,12 @@ adding a new `[dialects.<name>]` table — no code changes required.
 
 ```bash
 pip install -e ".[test]"
-pytest            # runs the suite in ./test
+pytest
+```
+
+Building the documentation locally:
+
+```bash
+pip install -r docs/requirements.txt
+cd docs && make html
 ```

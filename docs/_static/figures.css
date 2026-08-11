@@ -1,0 +1,8 @@
+/* The example plots are Matplotlib exports with an opaque white canvas.
+   Give them a light mat in dark mode so they do not float on a dark page. */
+img.plot-figure,
+.plot-figure img {
+    background: #ffffff;
+    border-radius: 4px;
+    padding: 0.25rem;
+}
