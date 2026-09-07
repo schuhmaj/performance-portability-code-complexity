@@ -15,13 +15,15 @@ multiplication, an n-body simulation, and a polyhedral gravity model — across
 CUDA, HIP, SYCL, Kokkos, RAJA, Alpaka, OpenMP, OpenACC, OpenCL, Vulkan,
 Boost.Compute, WebGPU, Slang, Metal, and ``stdpar``.
 
-This package provides three workflows:
+This package provides four workflows:
 
 * :doc:`Code complexity <usage/code_complexity>` — Halstead and LOC/SLOC
   metrics for C++ and *GPU-enriched* C++. This part is **stand-alone**: it
   needs nothing but the source files you point it at.
 * :doc:`Benchmarking <usage/benchmark>` — discover and run Google Benchmark
   executables and consolidate their JSON reports into one tidy CSV.
+* :doc:`Kernel profiling <usage/profiling>` — batch-run Nvidia Nsight Compute
+  over the same executables and build a roofline model from the counters.
 * :doc:`P3 analysis and plotting <usage/plots>` — application efficiency,
   performance portability, and five chart types that relate both to code
   complexity.
@@ -57,6 +59,7 @@ theirs.
 
    usage/code_complexity
    usage/benchmark
+   usage/profiling
    usage/p3analysis
    usage/plots
 
@@ -66,6 +69,7 @@ theirs.
 
    api/code_complexity
    api/benchmark
+   api/profiling
    api/performance_portability
    api/plot
 

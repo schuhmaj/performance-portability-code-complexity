@@ -11,10 +11,12 @@ Everything is reachable through the single ``ppbcc`` executable:
 
     ppbcc code-complexity SOURCES...   # Halstead / LOC metrics
     ppbcc benchmark -r REGEX...        # run and consolidate benchmarks
+    ppbcc profile -r REGEX...          # profile kernels with ncu, roofline model
     ppbcc p3analysis NAME CSV...       # efficiency, portability, plots
 
 Each command is also installed as a prefixed executable
-(``ppbcc-code-complexity``, ``ppbcc-benchmark``, ``ppbcc-p3analysis``), and the
+(``ppbcc-code-complexity``, ``ppbcc-benchmark``, ``ppbcc-profile``,
+``ppbcc-p3analysis``), and the
 package can be run as a module:
 
 .. code-block:: bash
@@ -84,6 +86,43 @@ Run Google Benchmark targets and consolidate their JSON reports into one CSV.
      - Base name of the consolidated CSV (defaults to a timestamped name)
 
 Details and examples: :doc:`../usage/benchmark`.
+
+``ppbcc profile``
+-----------------
+
+Batch-profile CUDA kernels with Nsight Compute and draw a roofline model.
+Expects executables built with ``-DPPB_PROFILING=ON``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Option
+     - Meaning
+   * - ``-b, --build-dir``
+     - Build folder used as the working directory for the whole pipeline
+   * - ``-p, --path`` / ``-r, --regex`` / ``-x, --exclude``
+     - Executable discovery, exactly as for ``ppbcc benchmark`` (``--regex`` is required)
+   * - ``-d, --report-dir``
+     - Where the ``<executable>.ncu-rep`` reports are written (default: ``profiling``)
+   * - ``-s, --skip-profile``
+     - Run nothing; only re-parse the reports already in ``--report-dir``
+   * - ``-m, --memory-level``
+     - Level the arithmetic intensity refers to: ``dram`` (default), ``l2``, ``l1``
+   * - ``--precision``
+     - ``auto`` (default, follows the build), ``fp32``, ``fp64``, ``fp16``
+   * - ``-a, --aggregate``
+     - ``sum`` (default), ``dominant``, or ``none`` — how kernels become plot points
+   * - ``-k, --exclude-kernel``
+     - Drop kernels matching a pattern from the plot, e.g. framework bootstrap kernels
+   * - ``--roofline`` / ``--roofline-output``
+     - Render the roofline chart, optionally to a given path
+   * - ``--no-csv``
+     - Skip the consolidated CSV (for a pure collection run)
+   * - ``-H, --hardware`` / ``-o, --output``
+     - Hardware label and base name of the consolidated CSV
+
+Details and examples: :doc:`../usage/profiling`.
 
 ``ppbcc p3analysis``
 --------------------

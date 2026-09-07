@@ -40,6 +40,7 @@ ppbcc = "ppbcc.__main__:main"
 ppbcc-code-complexity = "ppbcc.__main__:code_complexity_main"
 ppbcc-p3analysis = "ppbcc.__main__:p3analysis_main"
 ppbcc-benchmark = "ppbcc.__main__:benchmark_main"
+ppbcc-profile = "ppbcc.__main__:profile_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

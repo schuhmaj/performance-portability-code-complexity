@@ -16,6 +16,45 @@ VELOCITY_UPDATE_TIME = "Velocity Update Time"
 FORCE_UPDATE_TIME = "Force Update Time"
 TIME_UNIT = "Time Unit"
 
+# --------------------------------------------------------------------------- #
+# Kernel profiling (ppbcc profile)
+# --------------------------------------------------------------------------- #
+EXECUTABLE = "Executable"
+KERNEL = "Kernel"
+KERNEL_SIGNATURE = "Kernel Signature"
+KERNEL_ID = "Kernel ID"
+GRID_SIZE = "Grid Size"
+BLOCK_SIZE = "Block Size"
+DURATION = "Duration"
+FLOP = "FLOP"
+MEMORY_TRAFFIC = "Memory Traffic"
+ARITHMETIC_INTENSITY = "Arithmetic Intensity"
+PERFORMANCE = "Performance"
+PEAK_PERFORMANCE = "Peak Performance"
+PEAK_BANDWIDTH = "Peak Bandwidth"
+MEMORY_LEVEL = "Memory Level"
+
+PROFILE_COLUMN_LIST = [
+    BENCHMARK_PROBLEM,
+    PARADIGM,
+    PRECISION,
+    HARDWARE,
+    EXECUTABLE,
+    KERNEL_ID,
+    KERNEL,
+    KERNEL_SIGNATURE,
+    GRID_SIZE,
+    BLOCK_SIZE,
+    DURATION,
+    MEMORY_LEVEL,
+    FLOP,
+    MEMORY_TRAFFIC,
+    ARITHMETIC_INTENSITY,
+    PERFORMANCE,
+    PEAK_PERFORMANCE,
+    PEAK_BANDWIDTH,
+]
+
 APPLICATION = "Application"
 APPLICATION_EFFICIENCY = "Application Efficiency"
 PERFORMANCE_PORTABILITY = "Performance Portability"

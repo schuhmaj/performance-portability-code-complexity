@@ -21,12 +21,14 @@ useful for any C++/GPU codebase.
 📖 **[Documentation](https://schuhmaj.github.io/performance-portability-code-complexity/)**
  · 🖼️ **[Example plots](examples/)**
 
-The package is split into four focused areas:
+The package is split into five focused areas:
 
 - `ppbcc.code_complexity` — Halstead and LOC/SLOC analysis with dialect-aware
   token counting (**stand-alone**).
 - `ppbcc.benchmark` — discovers and runs Google Benchmark executables and
   consolidates their JSON reports into tidy CSV data.
+- `ppbcc.profiling` — batch-runs Nvidia Nsight Compute (`ncu`) over the same
+  executables and turns the per-kernel counters into a roofline model.
 - `ppbcc.performance_portability` — loads benchmark CSVs and calculates
   application efficiency and performance portability.
 - `ppbcc.plot` — Cascade, Navchart, combined, application-efficiency heatmap,
@@ -76,11 +78,13 @@ Everything is reachable through the single `ppbcc` executable:
 ```bash
 ppbcc code-complexity path/to/src -o complexity.csv
 ppbcc benchmark -b path/to/build -p . -r '.*nbody.*' -H RTX5080 -o results
+ppbcc profile -b path/to/build -p . -r '.*nbody.*' -H RTX5080 --roofline
 ppbcc p3analysis NBody results.csv --chart cascade -o nbody.pdf
 ```
 
 Each command is also installed as a prefixed executable
-(`ppbcc-code-complexity`, `ppbcc-benchmark`, `ppbcc-p3analysis`), and the
+(`ppbcc-code-complexity`, `ppbcc-benchmark`, `ppbcc-profile`,
+`ppbcc-p3analysis`), and the
 package can be run as a module: `python -m ppbcc code-complexity src/`.
 
 > [!TIP]
@@ -127,6 +131,36 @@ Runs Google Benchmark targets and consolidates their JSON reports into one CSV.
 ```bash
 ppbcc benchmark -p src -H "NVIDIA RTX5080" -r "vec_.*" "nbody_.*" -x ".*_cpp" --dry-run
 ```
+
+### `ppbcc profile`
+
+Batch-profiles CUDA kernels with Nvidia Nsight Compute (`ncu`), consolidates the
+per-kernel counters into one CSV, and draws a roofline model. Expects
+executables built with `-DPPB_PROFILING=ON`, which reduces each of them to a
+single input running a single iteration.
+
+| Option | Meaning |
+| --- | --- |
+| `-b, --build-dir` | Build folder used as the working directory for the whole pipeline |
+| `-p, --path` / `-r, --regex` / `-x, --exclude` | Executable discovery, exactly as for `ppbcc benchmark` (`--regex` is required) |
+| `-d, --report-dir` | Where the `<executable>.ncu-rep` reports are written (default: `profiling`) |
+| `-s, --skip-profile` | Run nothing; only re-parse the reports already in `--report-dir` |
+| `-m, --memory-level` | Level the arithmetic intensity refers to: `dram` (default), `l2`, `l1` |
+| `--precision` | `auto` (default, follows the build), `fp32`, `fp64`, `fp16` |
+| `-a, --aggregate` | `sum` (default), `dominant`, or `none` — how kernels become plot points |
+| `-k, --exclude-kernel` | Drop kernels matching a pattern from the plot, e.g. framework bootstrap kernels |
+| `--roofline` / `--roofline-output` | Render the roofline chart, optionally to a given path |
+| `--no-csv` | Skip the consolidated CSV (for a pure collection run) |
+| `-H, --hardware` / `-o, --output` | Hardware label and base name of the consolidated CSV |
+
+```bash
+ppbcc profile -b build-cuda-llvm-profiling -p src -r "polyhedral_.*" \
+  -d profiling -H "NVIDIA RTX5080" -o Profiling_NVIDIA_RTX5080 --roofline
+```
+
+> [!NOTE]
+> Nsight Compute only sees CUDA kernels. OpenCL, Vulkan and host-only
+> executables produce no report and are skipped with a warning.
 
 ### `ppbcc p3analysis`
 
