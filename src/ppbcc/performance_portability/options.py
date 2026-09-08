@@ -67,9 +67,19 @@ def build_parser() -> argparse.ArgumentParser:
     general.add_argument(
         "-c",
         "--chart",
-        choices=("cascade", "navchart", "combined", "heatmap", "boxplot"),
+        choices=(
+            "cascade",
+            "navchart",
+            "combined",
+            "complexity-comparison",
+            "heatmap",
+            "boxplot",
+        ),
         default="cascade",
-        help="Chart to create. Navchart and combined require --complexity.",
+        help=(
+            "Chart to create. Navchart, combined and complexity-comparison "
+            "require --complexity."
+        ),
     )
     general.add_argument(
         "-l",
@@ -154,7 +164,10 @@ def build_parser() -> argparse.ArgumentParser:
     metrics.add_argument(
         "--log-size",
         action="store_true",
-        help="Use a logarithmic problem-size axis in the combined scaling plot.",
+        help=(
+            "Deprecated and ignored. The combined scaling panel is a heatmap "
+            "over the discrete benchmark sizes and has no continuous axis."
+        ),
     )
 
     complexity.add_argument(
@@ -186,8 +199,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Subtract the CPP complexity score from every paradigm score.",
     )
     complexity.add_argument(
+        "--compare-metric",
+        default="sloc",
+        help=(
+            "Second complexity metric for --chart complexity-comparison, "
+            "plotted on the x axis against --complexity-metric on the y axis. "
+            "Both are expressed relative to the sequential CPP baseline."
+        ),
+    )
+    complexity.add_argument(
+        "--legend-complexity-comparison-coefficients",
+        dest="legend_comparison_coefficients",
+        action="store_true",
+        help=(
+            "Box Spearman's rho and Kendall's tau in the corner of the "
+            "complexity-comparison chart. Off by default: the coefficients "
+            "belong in the running text, where they can be discussed."
+        ),
+    )
+    complexity.add_argument(
         "--log-complexity",
         action="store_true",
-        help="Use a logarithmic complexity axis in navchart/combined plots.",
+        help=(
+            "Use logarithmic complexity axes in navchart, combined and "
+            "complexity-comparison plots."
+        ),
     )
     return parser

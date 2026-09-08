@@ -21,6 +21,12 @@ Navchart
 .. automodule:: ppbcc.plot.navchart
    :members:
 
+Complexity Comparison
+---------------------
+
+.. automodule:: ppbcc.plot.complexity_comparison
+   :members:
+
 Heatmap and Boxplot
 -------------------
 

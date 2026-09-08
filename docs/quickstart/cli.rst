@@ -158,11 +158,15 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
    * - ``CSV``
      - One or more CSVs produced by ``ppbcc benchmark``
    * - ``-c, --chart``
-     - ``cascade`` (default), ``navchart``, ``combined``, ``heatmap``, ``boxplot``
+     - ``cascade`` (default), ``navchart``, ``combined``, ``complexity-comparison``, ``heatmap``, ``boxplot``
    * - ``--complexity``
-     - Code-complexity CSV; **required** for ``navchart`` and ``combined``
+     - Code-complexity CSV; **required** for ``navchart``, ``combined`` and ``complexity-comparison``
    * - ``--complexity-metric``
      - SLOC, Halstead vocabulary/length/volume/difficulty/effort (default: ``halstead-effort``)
+   * - ``--compare-metric``
+     - x-axis metric of ``complexity-comparison`` (default: ``sloc``); ``--complexity-metric`` is its y axis
+   * - ``--legend-complexity-comparison-coefficients``
+     - Box Spearman's rho and Kendall's tau in ``complexity-comparison`` (off by default)
    * - ``--normalize`` / ``--additive``
      - Divide by, or subtract, the plain-C++ complexity score (mutually exclusive)
    * - ``-s, --size``
@@ -195,13 +199,19 @@ combinations rather than silently ignoring them:
    * - Option
      - Valid for
    * - ``--complexity``
-     - ``navchart``, ``combined`` (warned and ignored elsewhere)
+     - ``navchart``, ``combined``, ``complexity-comparison`` (warned and ignored elsewhere)
    * - ``--normalize``/``--additive``
-     - ``navchart``, ``combined``, together with ``--complexity``
+     - ``navchart``, ``combined``, together with ``--complexity``; ``complexity-comparison``
+       always normalizes and rejects ``--additive``
    * - ``--log-complexity``
-     - ``navchart``, ``combined``
+     - ``navchart``, ``combined``, ``complexity-comparison``
+   * - ``--compare-metric``
+     - ``complexity-comparison`` only
+   * - ``--legend-complexity-comparison-coefficients``
+     - ``complexity-comparison`` only
    * - ``--log-size``
-     - ``combined`` only
+     - Deprecated: the ``combined`` scaling panel is a heatmap over the discrete
+       benchmark sizes, so the option is accepted but ignored, with a warning
    * - ``-H, --hardware``
      - ``boxplot`` only
    * - ``-s avg``/``best``/``worst``

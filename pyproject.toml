@@ -30,6 +30,7 @@ dependencies = [
     "matplotlib>=3.8",
     "numpy>=1.26",
     "seaborn>=0.13",
+    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -9,8 +10,15 @@ import matplotlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 from loguru import logger
+from matplotlib.font_manager import FontProperties
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from matplotlib.ticker import (
+    FixedLocator,
+    FuncFormatter,
+    NullFormatter,
+    NullLocator,
+)
 
 from ppbcc.performance_portability.complexity import (
     _complexity_candidates,
@@ -79,7 +87,7 @@ def resolve_output_path(
         Output path with a suffix.
     """
     problem_slug = _slugify("_".join(problems))
-    path = output or Path(f"{problem_slug}_{mode}.pdf")
+    path = output or Path(f"{problem_slug}_{_slugify(mode)}.pdf")
     if not path.suffix:
         path = path.with_suffix(".pdf")
     return path
@@ -194,6 +202,136 @@ def _display_application(application: str, remove_description: bool) -> str:
     if not remove_description:
         return application
     return re.sub(r"\[[^]]*]", "", application).strip()
+
+
+def font_points(key: str, scale: float = 1.0) -> float:
+    """Resolve a font-size rcParam to points and scale it.
+
+    A size rcParam may be a number or one of Matplotlib's relative keywords
+    such as ``"medium"``, which seaborn replaces with a number only once a
+    theme is applied. Going through ``FontProperties`` handles both.
+
+    Args:
+        key: Font-size rcParam name, e.g. ``"axes.labelsize"``.
+        scale: Factor applied to the resolved size.
+
+    Returns:
+        The scaled size in points.
+    """
+    size = FontProperties(size=matplotlib.rcParams[key]).get_size_in_points()
+    return size * scale
+
+
+#: Axis titles for the complexity metrics. The loader's own label ("Source
+#: Lines of Code [normalized]") is too wide for a small panel and does not say
+#: what "normalized" is relative to.
+SHORT_METRIC_NAMES = {
+    "sloc": "SLOC",
+    "source lines of code": "SLOC",
+    "halstead vocabulary": r"Halstead $\eta$",
+    "halstead program length": "Halstead $N$",
+    "halstead volume": "Halstead $V$",
+    "halstead difficulty": "Halstead $D$",
+    "halstead effort": "Halstead $E$",
+}
+#: How each scaling mode of the complexity loader is spelled out on an axis.
+SCALING_SUFFIXES = {
+    "normalized": "[% of sequential C++]",
+    "additive": "[added over sequential C++]",
+    "absolute": "[absolute]",
+}
+
+
+def short_metric_label(metric: str) -> str:
+    """Turn a complexity column name into a compact axis title.
+
+    Args:
+        metric: Column name from the complexity loader, for example
+            ``"Halstead Difficulty [normalized]"``.
+
+    Returns:
+        A short title such as ``"Halstead $D$ [% of sequential C++]"``. A metric
+        or scaling mode that is not recognised is returned unchanged, so the
+        caller never loses information it cannot re-derive.
+    """
+    name, _, bracket = metric.partition("[")
+    short = SHORT_METRIC_NAMES.get(name.strip().casefold())
+    if short is None:
+        return metric
+    if not bracket:
+        return short
+    suffix = SCALING_SUFFIXES.get(bracket.rstrip("]").strip().casefold())
+    return metric if suffix is None else f"{short} {suffix}"
+
+
+#: Mantissa sets tried when labelling a logarithmic complexity axis, coarse to
+#: fine. Normalized complexity spans well under one decade, so the decade
+#: boundaries Matplotlib would use on their own can miss the data entirely.
+_LOG_TICK_STEPS = (
+    (1.0, 2.0, 5.0),
+    (1.0, 1.5, 2.0, 3.0, 5.0, 7.0),
+    (1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 7.0),
+    (1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2.0, 2.5, 3.0, 4.0, 5.0, 7.0),
+)
+_LOG_TICK_TARGET = 4
+
+
+def format_relative_log_axis(axis) -> None:
+    """Label a logarithmic complexity axis with plain decimal ticks.
+
+    Matplotlib's default log locator labels a range such as 100-700 as
+    ``10^2``, ``4x10^2``, ``6x10^2``, which is unreadable at figure scale, and
+    over a range such as 110-190 it places no major tick at all. Round values
+    inside the limits are used instead, choosing the mantissa set whose tick
+    count comes closest to _LOG_TICK_TARGET so that both a narrow and a wide
+    range stay readable. If no set yields at least two ticks the axis is left
+    alone rather than stripped of its labels.
+
+    Args:
+        axis: The x or y axis to format.
+    """
+    low, high = sorted(axis.get_view_interval())
+    if not (low > 0.0 and high > low):
+        return
+
+    def ticks_for(steps: tuple[float, ...]) -> list[float]:
+        values: list[float] = []
+        decade = math.floor(math.log10(low))
+        while decade <= math.ceil(math.log10(high)):
+            values.extend(step * 10.0**decade for step in steps)
+            decade += 1
+        return [value for value in values if low <= value <= high]
+
+    candidates = [ticks_for(steps) for steps in _LOG_TICK_STEPS]
+    usable = [found for found in candidates if len(found) >= 2]
+    if not usable:
+        return
+    best = min(usable, key=lambda found: abs(len(found) - _LOG_TICK_TARGET))
+    axis.set_major_locator(FixedLocator(best))
+    axis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}"))
+    axis.set_minor_locator(NullLocator())
+    axis.set_minor_formatter(NullFormatter())
+
+
+def use_inward_ticks(axes: plt.Axes) -> None:
+    """Keep a right-hand y axis from reading as negative numbers.
+
+    With Matplotlib's default outward ticks a right-hand axis draws the tick
+    mark between the spine and its label, so ``1.0`` reads as ``-1.0``. Turning
+    the ticks inward is not enough on its own under seaborn's whitegrid style,
+    whose spine is too faint to separate them: the labels also move further out
+    and the spine is darkened, so the axis line is unmistakably between the
+    tick and the number.
+
+    Args:
+        axes: Axes whose right-hand y axis is corrected.
+    """
+    axes.yaxis.set_tick_params(direction="in", length=3.5, pad=8)
+    spine = axes.spines.get("right")
+    if spine is not None:
+        spine.set_visible(True)
+        spine.set_color("0.35")
+        spine.set_linewidth(1.0)
 
 
 def _application_legend_handles(
