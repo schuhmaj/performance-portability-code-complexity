@@ -25,6 +25,25 @@ Report Parsing
 .. automodule:: ppbcc.profiling.reports
    :members:
 
+
+LIKWID Backend
+--------------
+
+.. automodule:: ppbcc.profiling.likwid
+   :members:
+
+Nsight Systems Backend
+----------------------
+
+.. automodule:: ppbcc.profiling.nsys
+   :members:
+
+Nsight Graphics Backend
+-----------------------
+
+.. automodule:: ppbcc.profiling.ngfx
+   :members:
+
 Command Line Interface
 ----------------------
 

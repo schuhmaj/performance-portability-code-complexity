@@ -11,7 +11,7 @@ Everything is reachable through the single ``ppbcc`` executable:
 
     ppbcc code-complexity SOURCES...   # Halstead / LOC metrics
     ppbcc benchmark -r REGEX...        # run and consolidate benchmarks
-    ppbcc profile -r REGEX...          # profile kernels with ncu, roofline model
+    ppbcc profile -r REGEX...          # profile kernels (ncu or likwid), roofline model
     ppbcc p3analysis NAME CSV...       # efficiency, portability, plots
 
 Each command is also installed as a prefixed executable
@@ -90,8 +90,10 @@ Details and examples: :doc:`../usage/benchmark`.
 ``ppbcc profile``
 -----------------
 
-Batch-profile CUDA kernels with Nsight Compute and draw a roofline model.
-Expects executables built with ``-DPPB_PROFILING=ON``.
+Batch-profile GPU kernels and draw a roofline model. Expects executables built
+with ``-DPPB_PROFILING=ON``. ``--profiler`` picks the backend: ``ncu`` (default,
+one row per kernel launch) or ``likwid`` (one row per marked region, needs
+``-DPPB_ENABLE_LIKWID=ON`` too).
 
 .. list-table::
    :header-rows: 1
@@ -104,21 +106,37 @@ Expects executables built with ``-DPPB_PROFILING=ON``.
    * - ``-p, --path`` / ``-r, --regex`` / ``-x, --exclude``
      - Executable discovery, exactly as for ``ppbcc benchmark`` (``--regex`` is required)
    * - ``-d, --report-dir``
-     - Where the ``<executable>.ncu-rep`` reports are written (default: ``profiling``)
+     - Where the profiler artefacts are written (default: ``profiling``)
+   * - ``--profiler``
+     - ``ncu`` (default), ``nsys``, ``ngfx`` or ``likwid``
+   * - ``--profiler-path``
+     - Path to that backend's CLI; found automatically otherwise
+   * - ``-O, --option``
+     - ``NAME=VALUE`` setting of the selected backend; ``--help`` lists the names
+   * - ``--from-csv``
+     - Skip profiling and plot from consolidated CSVs, merging several backends
    * - ``-s, --skip-profile``
-     - Run nothing; only re-parse the reports already in ``--report-dir``
+     - Run nothing; only re-parse the artefacts already in ``--report-dir``
+   * - ``--timeout``
+     - Wall-clock limit per executable; a run that hits it is skipped
    * - ``-m, --memory-level``
      - Level the arithmetic intensity refers to: ``dram`` (default), ``l2``, ``l1``
    * - ``--precision``
      - ``auto`` (default, follows the build), ``fp32``, ``fp64``, ``fp16``
+   * - ``--region``
+     - Plot only the regions matching a pattern, e.g. ``--region evaluate``
+   * - ``--all-kernels``
+     - Keep the launches outside every named region (dropped by default)
    * - ``-a, --aggregate``
-     - ``sum`` (default), ``dominant``, or ``none`` — how kernels become plot points
-   * - ``-k, --exclude-kernel``
-     - Drop kernels matching a pattern from the plot, e.g. framework bootstrap kernels
-   * - ``--roofline`` / ``--roofline-output``
+     - ``sum`` (default), ``dominant``, or ``none`` — how launches become plot points
+   * - ``--roofline [PATH]``
      - Render the roofline chart, optionally to a given path
    * - ``--no-csv``
      - Skip the consolidated CSV (for a pure collection run)
+   * - ``--peak-performance`` / ``--peak-bandwidth``
+     - Roofline ceilings for the backends without ``peak_sustained`` counters
+   * - ``--analytic-flop``
+     - ``REGEX=FLOP`` work model for ``nsys``/``ngfx``
    * - ``-H, --hardware`` / ``-o, --output``
      - Hardware label and base name of the consolidated CSV
 

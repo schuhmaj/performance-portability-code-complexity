@@ -23,6 +23,9 @@ EXECUTABLE = "Executable"
 KERNEL = "Kernel"
 KERNEL_SIGNATURE = "Kernel Signature"
 KERNEL_ID = "Kernel ID"
+REGION = "Region"
+#: Kernel name given to a row that stands for every launch of one region.
+AGGREGATED_KERNEL = "all kernels of the region"
 GRID_SIZE = "Grid Size"
 BLOCK_SIZE = "Block Size"
 DURATION = "Duration"
@@ -40,6 +43,7 @@ PROFILE_COLUMN_LIST = [
     PRECISION,
     HARDWARE,
     EXECUTABLE,
+    REGION,
     KERNEL_ID,
     KERNEL,
     KERNEL_SIGNATURE,

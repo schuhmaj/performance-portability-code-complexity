@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import platform
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from loguru import logger
@@ -12,6 +14,32 @@ from ppbcc.profiling.metrics import ROOFLINE_METRICS
 
 #: File name suffix Nsight Compute appends to ``--export``.
 REPORT_SUFFIX = ".ncu-rep"
+
+
+def aslr_prefix() -> list[str]:
+    """Return the launcher that runs a child with ASLR disabled.
+
+    Google Benchmark's ``main`` calls ``MaybeReenterWithoutASLR``, which
+    ``execv``s the process to get reproducible timings. Nsight Compute attaches
+    to the pre-exec process; with ``--target-processes all`` it then also
+    attaches to the re-executed one, and on some binaries (``matMul_kokkos``,
+    ``matMul_omp``) the profiler afterwards spins at 100 % CPU with the
+    application suspended and never finishes. Starting the process with ASLR
+    already off makes Google Benchmark skip the re-exec, and the same runs
+    complete in seconds.
+
+    Returns:
+        The ``setarch ... -R`` argument vector, or an empty list if ``setarch``
+        is unavailable (the run then simply keeps the re-exec).
+    """
+    setarch = shutil.which("setarch")
+    if setarch is None:
+        logger.warning(
+            "setarch not found, so the benchmarks keep Google Benchmark's ASLR "
+            "re-exec; Nsight Compute may hang on some of them."
+        )
+        return []
+    return [setarch, platform.machine(), "-R"]
 
 
 def find_ncu(explicit: str | None = None) -> str:
@@ -45,6 +73,7 @@ def profile_command(
     benchmark_report: Path | None = None,
     extra_ncu_args: list[str] | None = None,
     extra_target_args: list[str] | None = None,
+    disable_aslr: bool = True,
 ) -> list[str]:
     """Build the ``ncu`` command line for one benchmark executable.
 
@@ -58,16 +87,23 @@ def profile_command(
             the profiler output itself does not know about.
         extra_ncu_args: Additional profiler arguments.
         extra_target_args: Additional arguments for the benchmark binary.
+        disable_aslr: Whether to start the profiler through
+            :func:`aslr_prefix`, which stops Google Benchmark from re-executing
+            the process under the profiler.
 
     Returns:
         The argument vector to execute.
     """
-    command = [
+    command = (aslr_prefix() if disable_aslr else []) + [
         ncu,
         # AdaptiveCpp, Kokkos and Google Benchmark itself may re-exec the
         # process, so the profiler has to follow child processes.
         "--target-processes",
         "all",
+        # Every launch is reported with the NVTX range it happened under, which
+        # is what tells the benchmark's own kernels from the runtime's setup
+        # work; see src/common/Marker.h in the benchmark repository.
+        "--nvtx",
         "--metrics",
         ",".join(metrics or ROOFLINE_METRICS),
         "--force-overwrite",
@@ -85,7 +121,12 @@ def profile_command(
     return command
 
 
-def _run(command: list[str], name: str, stream_output: bool) -> None:
+def _run(
+    command: list[str],
+    name: str,
+    stream_output: bool,
+    timeout: float | None = None,
+) -> None:
     """Execute one profiler run.
 
     Args:
@@ -93,18 +134,24 @@ def _run(command: list[str], name: str, stream_output: bool) -> None:
         name: Label used in log messages.
         stream_output: Whether to forward the profiler output to the logger at
             TRACE level instead of discarding it.
+        timeout: Wall-clock limit in seconds, or ``None`` for no limit. A
+            profiler that replays kernel launches can stop making progress
+            without ever exiting, which without a limit blocks the whole batch.
 
     Raises:
         subprocess.CalledProcessError: If the profiler exits non-zero.
+        subprocess.TimeoutExpired: If the run exceeds ``timeout``.
     """
     if not stream_output:
         subprocess.run(
             command,
             check=True,
+            timeout=timeout,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         return
+    deadline = None if timeout is None else time.monotonic() + timeout
     with subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
@@ -115,7 +162,15 @@ def _run(command: list[str], name: str, stream_output: bool) -> None:
         assert process.stdout is not None
         for line in process.stdout:
             logger.trace(f"[{name}] {line.rstrip()}")
-        returncode = process.wait()
+            if deadline is not None and time.monotonic() > deadline:
+                process.kill()
+                raise subprocess.TimeoutExpired(command, timeout)
+        remaining = None if deadline is None else max(deadline - time.monotonic(), 0.0)
+        try:
+            returncode = process.wait(timeout=remaining)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            raise
     if returncode != 0:
         raise subprocess.CalledProcessError(returncode, command)
 
@@ -129,6 +184,8 @@ def run_profiles(
     extra_ncu_args: list[str] | None = None,
     extra_target_args: list[str] | None = None,
     stream_output: bool = False,
+    timeout: float | None = None,
+    disable_aslr: bool = True,
 ) -> list[Path]:
     """Profile every executable, one after another.
 
@@ -145,6 +202,9 @@ def run_profiles(
         extra_ncu_args: Additional profiler arguments.
         extra_target_args: Additional arguments for the benchmark binaries.
         stream_output: Whether to forward the profiler output to the logger.
+        timeout: Wall-clock limit per executable in seconds, or ``None`` for no
+            limit. A run that hits the limit is skipped, and the batch goes on.
+        disable_aslr: Whether to launch through :func:`aslr_prefix`.
 
     Returns:
         The reports that exist after the batch, in execution order.
@@ -167,11 +227,17 @@ def run_profiles(
             benchmark_report=output_dir / f"{target.name}.json",
             extra_ncu_args=extra_ncu_args,
             extra_target_args=extra_target_args,
+            disable_aslr=disable_aslr,
         )
         logger.info(f"[{index}/{len(executables)}] Profiling {target.name} ...")
         logger.debug(f"Command: {' '.join(command)}")
         try:
-            _run(command, target.name, stream_output)
+            _run(command, target.name, stream_output, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            logger.error(
+                f"Timed out after {timeout} s profiling {target.name}; skipping it."
+            )
+            continue
         except subprocess.CalledProcessError as error:
             logger.error(f"Failed to profile {target}: {error}")
             continue

@@ -8,6 +8,7 @@ import pandas as pd
 from matplotlib.ticker import EngFormatter
 
 from ppbcc.constants import (
+    AGGREGATED_KERNEL,
     ARITHMETIC_INTENSITY,
     KERNEL,
     MEMORY_LEVEL,
@@ -16,6 +17,7 @@ from ppbcc.constants import (
     PEAK_PERFORMANCE,
     PERFORMANCE,
     PRECISION,
+    REGION,
 )
 from ppbcc.plot.styles import (
     SCATTER_MARKER_AREA,
@@ -41,8 +43,9 @@ def _ceilings(data: pd.DataFrame) -> tuple[float, float]:
     peak_bandwidth = float(pd.to_numeric(data[PEAK_BANDWIDTH], errors="coerce").max())
     if not np.isfinite(peak_flops) or not np.isfinite(peak_bandwidth):
         raise ValueError(
-            "The profiler reported no peak_sustained metrics, so no roofline "
-            "can be drawn."
+            "No ceilings available, so no roofline can be drawn. Nsight Compute "
+            "measures them from its peak_sustained metrics; LIKWID has none, so "
+            "pass --peak-performance and --peak-bandwidth there."
         )
     return peak_flops, peak_bandwidth
 
@@ -140,8 +143,15 @@ def plot_roofline(
             zorder=3,
         )
         if label_points:
+            # The paradigm alone is ambiguous whenever one implementation
+            # contributes more than one point: the polyhedral binaries have an
+            # "init" and an "evaluate" region, and the CUDA matrix
+            # multiplication links cuBLAS next to its own kernel.
             label = str(row[PARADIGM])
-            if row.get(KERNEL, "all kernels") != "all kernels":
+            region = str(row.get(REGION, "") or "")
+            if region:
+                label = f"{label}: {region}"
+            elif row.get(KERNEL, AGGREGATED_KERNEL) != AGGREGATED_KERNEL:
                 label = f"{label}: {row[KERNEL]}"
             axis.annotate(
                 label,

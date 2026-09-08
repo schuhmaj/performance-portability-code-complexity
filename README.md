@@ -120,47 +120,53 @@ Runs Google Benchmark targets and consolidates their JSON reports into one CSV.
 | Option | Meaning |
 | --- | --- |
 | `-b, --build-dir` | Build folder used as the working directory for the whole pipeline |
-| `-p, --path` | Directories searched recursively, relative to `--build-dir` |
-| `-r, --regex` | **Required.** Pattern(s) matched against file paths to select executables (or reports) |
-| `-x, --exclude` | Pattern(s) excluding matched paths, e.g. `'.*_cpp'` |
-| `-s, --skip-benchmark` | Run nothing; locate existing JSON reports and only consolidate them |
-| `-n, --dry-run` | List the matched executables (or reports) and exit |
-| `-H, --hardware` | Value stored in the `Hardware` column, e.g. `"NVIDIA RTX5080"` |
-| `-o, --output` | Base name of the consolidated CSV (defaults to a timestamped name) |
-
-```bash
-ppbcc benchmark -p src -H "NVIDIA RTX5080" -r "vec_.*" "nbody_.*" -x ".*_cpp" --dry-run
-```
-
-### `ppbcc profile`
-
-Batch-profiles CUDA kernels with Nvidia Nsight Compute (`ncu`), consolidates the
-per-kernel counters into one CSV, and draws a roofline model. Expects
-executables built with `-DPPB_PROFILING=ON`, which reduces each of them to a
-single input running a single iteration.
-
-| Option | Meaning |
-| --- | --- |
-| `-b, --build-dir` | Build folder used as the working directory for the whole pipeline |
+| `--profiler` | `ncu` (default), `nsys`, `ngfx` or `likwid` |
+| `--profiler-path` | Path to that backend's CLI; found automatically otherwise |
+| `-O, --option` | `NAME=VALUE` setting of the selected backend; `--help` lists the names |
+| `--from-csv` | Skip profiling and plot from consolidated CSVs, merging several backends |
+| `--timeout` | Wall-clock limit per executable; a run that hits it is skipped |
 | `-p, --path` / `-r, --regex` / `-x, --exclude` | Executable discovery, exactly as for `ppbcc benchmark` (`--regex` is required) |
-| `-d, --report-dir` | Where the `<executable>.ncu-rep` reports are written (default: `profiling`) |
-| `-s, --skip-profile` | Run nothing; only re-parse the reports already in `--report-dir` |
+| `-d, --report-dir` | Where the profiler artefacts are written (default: `profiling`) |
+| `-s, --skip-profile` | Run nothing; only re-parse the artefacts already in `--report-dir` |
 | `-m, --memory-level` | Level the arithmetic intensity refers to: `dram` (default), `l2`, `l1` |
 | `--precision` | `auto` (default, follows the build), `fp32`, `fp64`, `fp16` |
-| `-a, --aggregate` | `sum` (default), `dominant`, or `none` — how kernels become plot points |
-| `-k, --exclude-kernel` | Drop kernels matching a pattern from the plot, e.g. framework bootstrap kernels |
-| `--roofline` / `--roofline-output` | Render the roofline chart, optionally to a given path |
+| `--region` | Plot only the regions matching a pattern, e.g. `--region evaluate` |
+| `--all-kernels` | Keep the launches outside every named region (dropped by default) |
+| `-a, --aggregate` | `sum` (default), `dominant`, or `none` — how launches become plot points |
+| `--roofline [PATH]` | Render the roofline chart, optionally to a given path |
 | `--no-csv` | Skip the consolidated CSV (for a pure collection run) |
+| `--peak-performance` / `--peak-bandwidth` | Roofline ceilings for the backends without `peak_sustained` counters; `--peak-bandwidth` also converts the sampled percentages to bytes |
+| `--analytic-flop` | `REGEX=FLOP` work model for `nsys`/`ngfx`, whose metric sets carry pipe utilisations rather than instruction counts |
 | `-H, --hardware` / `-o, --output` | Hardware label and base name of the consolidated CSV |
 
 ```bash
 ppbcc profile -b build-cuda-llvm-profiling -p src -r "polyhedral_.*" \
   -d profiling -H "NVIDIA RTX5080" -o Profiling_NVIDIA_RTX5080 --roofline
+
+# The same run through the in-source markers instead
+ppbcc profile --profiler likwid -b build-likwid -p src -r "polyhedral_.*" \
+  -O lib="$LIKWID_PREFIX/lib" --peak-performance 5.74e13 --peak-bandwidth 9.59e11 \
+  -d profiling-likwid -H "NVIDIA RTX5080" -o Profiling_LIKWID --roofline
 ```
+
+```bash
+# The paradigms without a CUDA context, and the merged roofline
+ppbcc profile --profiler nsys -b build-cuda-llvm-profiling -p src -r "matMul_ocl$" "matMul_vulkan$" \
+  -d profiling-nsys -O iterations=20 --peak-performance 5.74e13 --peak-bandwidth 9.592e11 \
+  --analytic-flop "matMul_.*=137438953472" -H "NVIDIA RTX5080" -o Profiling_NSYS
+ppbcc profile --from-csv Profiling_NVIDIA_RTX5080.csv Profiling_NSYS.csv -r "matMul_" \
+  --roofline --no-csv -H "NVIDIA RTX5080"
+```
+
+Every row carries the NVTX region the launch happened in — `matmul`, or `init`
+and `evaluate` — so a table holds the benchmark's own kernels and nothing else.
+Build with `-DPPB_PROFILING=ON` (which turns on `PPB_ENABLE_NVTX`) for that;
+without it the launches are unnamed and all of them are kept, with a warning.
 
 > [!NOTE]
 > Nsight Compute only sees CUDA kernels. OpenCL, Vulkan and host-only
-> executables produce no report and are skipped with a warning.
+> executables produce no report and are skipped with a warning; `--profiler
+> nsys` is what measures them.
 
 ### `ppbcc p3analysis`
 

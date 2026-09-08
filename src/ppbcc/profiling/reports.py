@@ -12,6 +12,7 @@ import pandas as pd
 from loguru import logger
 
 from ppbcc.constants import (
+    AGGREGATED_KERNEL,
     ARITHMETIC_INTENSITY,
     BENCHMARK_PROBLEM,
     BLOCK_SIZE,
@@ -31,6 +32,7 @@ from ppbcc.constants import (
     PERFORMANCE,
     PRECISION,
     PROFILE_COLUMN_LIST,
+    REGION,
 )
 from ppbcc.profiling.metrics import (
     MEMORY_LEVEL_CLOCK,
@@ -48,6 +50,20 @@ DURATION_METRIC = "gpu__time_duration.sum"
 #: Columns identifying a single kernel launch inside one report. "Block Size"
 #: and "Grid Size" already carry the names the tidy table uses.
 _LAUNCH_KEYS = ["ID", "Kernel Name", BLOCK_SIZE, GRID_SIZE]
+
+#: Substring identifying the column holding the NVTX push/pop stack a launch
+#: happened under. The full header spells out every payload field, so it is
+#: matched rather than written out.
+_NVTX_COLUMN_MARKER = "Push/Pop_Range"
+
+#: NVTX domain the benchmark's own regions live in. Third-party libraries open
+#: domains of their own -- CCCL brackets every ``thrust::reduce`` with a
+#: ``CCCL:cub::DeviceReduce::Reduce`` range -- and those sit *inside* the
+#: benchmark's range, so the innermost entry is the wrong one to read.
+_NVTX_DOMAIN = "<default domain>"
+
+#: One entry of the stack, as the profiler's CSV quotes it.
+_NVTX_ENTRY = re.compile(r'"([^"]*)"')
 
 
 def _short_kernel_name(signature: str) -> str:
@@ -77,6 +93,30 @@ def _short_kernel_name(signature: str) -> str:
     # Whatever is left in front (a return type such as "void") is not the name.
     words = name.split("<")[0].split()
     return words[-1] if words else signature
+
+
+def _nvtx_region(stack: object) -> str:
+    """Read the benchmark's region name out of an NVTX push/pop stack.
+
+    Args:
+        stack: One cell of the profiler's NVTX column, e.g.
+            ``12345  "<default domain>:evaluate:none:..."``. Every field after
+            the range name is an NVTX payload the benchmark does not use.
+
+    Returns:
+        The innermost range of :data:`_NVTX_DOMAIN`, or ``""`` for a launch
+        that happened outside every region -- a framework bootstrap kernel, or
+        a binary built without ``PPB_ENABLE_NVTX``.
+    """
+    if not isinstance(stack, str) or not stack.strip():
+        return ""
+    names = [
+        fields[1]
+        for entry in _NVTX_ENTRY.findall(stack)
+        for fields in [entry.split(":")]
+        if len(fields) > 1 and fields[0] == _NVTX_DOMAIN and fields[1]
+    ]
+    return names[-1] if names else ""
 
 
 def _import_csv(report: Path, ncu: str) -> pd.DataFrame:
@@ -119,7 +159,8 @@ def _pivot(long_table: pd.DataFrame) -> pd.DataFrame:
         errors="coerce",
     )
     wide = long_table.pivot_table(
-        index=_LAUNCH_KEYS,
+        index=_LAUNCH_KEYS
+        + [column for column in long_table if _NVTX_COLUMN_MARKER in column],
         columns="Metric Name",
         values="value",
         aggfunc="first",
@@ -294,8 +335,12 @@ def load_reports(
         frame[KERNEL_ID] = pd.to_numeric(frame["ID"], errors="coerce")
         frame[KERNEL_SIGNATURE] = frame["Kernel Name"]
         frame[KERNEL] = frame["Kernel Name"].map(_short_kernel_name)
+        # The NVTX column is only there when the report was collected with
+        # --nvtx against a binary built with PPB_ENABLE_NVTX.
+        nvtx = [column for column in frame if _NVTX_COLUMN_MARKER in column]
+        frame[REGION] = frame[nvtx[0]].map(_nvtx_region) if nvtx else ""
         # "Block Size"/"Grid Size" already carry their final names.
-        frame = frame.drop(columns=["ID", "Kernel Name"])
+        frame = frame.drop(columns=["ID", "Kernel Name", *nvtx])
 
         frame = _derive(frame, precision, memory_level)
         logger.debug(f"{executable}: {len(frame)} kernel launch(es)")
@@ -317,57 +362,145 @@ def load_reports(
     return combined
 
 
-def filter_kernels(frame: pd.DataFrame, patterns: list[str]) -> pd.DataFrame:
-    """Drop kernel launches whose name matches one of the given patterns.
+def load_csv(paths: list[Path]) -> pd.DataFrame:
+    """Concatenate consolidated profiling CSVs into one table.
 
-    Runtime bootstrap kernels (Kokkos' architecture query and desul's lock-array
-    initialization, for instance) are launched once by the framework and have
-    nothing to do with the algorithm under study, so they would distort an
-    aggregate over all launches.
+    No single profiler covers every paradigm in this benchmark: Nsight Compute
+    reads counters only inside a CUDA context, so Vulkan and OpenCL have to be
+    measured with other tools. Each tool writes the same columns, and this is
+    how their tables become one roofline.
 
     Args:
-        frame: Table returned by :func:`load_reports`.
-        patterns: Regular expressions matched (``re.search``) against both the
-            short kernel name and the full signature.
+        paths: Paths to CSVs written by ``ppbcc profile``.
 
     Returns:
-        The table without the matching launches.
+        The concatenated table, deduplicated on (executable, kernel id).
+        Empty if nothing could be read.
     """
-    if not patterns or frame.empty:
+    frames: list[pd.DataFrame] = []
+    for path in paths:
+        try:
+            frame = pd.read_csv(path)
+        except (OSError, ValueError) as error:
+            logger.error(f"Could not read {path}: {error}")
+            continue
+        missing = [column for column in (EXECUTABLE, PERFORMANCE) if column not in frame]
+        if missing:
+            logger.error(f"{path} is not a ppbcc profiling CSV (missing {missing})")
+            continue
+        logger.info(f"{path.name}: {len(frame)} row(s)")
+        frames.append(frame)
+    if not frames:
+        return pd.DataFrame(columns=PROFILE_COLUMN_LIST)
+    combined = pd.concat(frames, ignore_index=True)
+    keys = [
+        column
+        for column in (EXECUTABLE, REGION, KERNEL_ID, KERNEL)
+        if column in combined
+    ]
+    before = len(combined)
+    combined = combined.drop_duplicates(subset=keys, keep="last").reset_index(drop=True)
+    if len(combined) < before:
+        logger.warning(
+            f"Dropped {before - len(combined)} duplicate row(s); a later CSV wins"
+        )
+    logger.success(
+        f"Loaded {len(combined)} row(s) across "
+        f"{combined[EXECUTABLE].nunique()} executable(s)"
+    )
+    return combined
+
+
+def filter_regions(frame: pd.DataFrame, keep_unlabelled: bool = False) -> pd.DataFrame:
+    """Keep only the launches that happened inside a named region.
+
+    The benchmark brackets the work it is about -- ``matmul``, ``init``,
+    ``evaluate`` -- with the NVTX ranges of ``src/common/Marker.h``. Everything
+    outside them is the runtime setting itself up: Kokkos' architecture query,
+    desul's lock-array initialization, a framework's buffer staging. Those
+    launches say nothing about the algorithm and would distort any aggregate
+    over an executable, so they do not belong in the table.
+
+    An executable that carries no region at all is kept as it is, with a
+    warning: it was built without ``PPB_ENABLE_NVTX``, profiled without
+    ``--nvtx``, or measured by a backend that cannot see NVTX ranges -- Nsight
+    Graphics traces a queue submission, which carries none. Dropping every one
+    of its rows would hide that.
+
+    Args:
+        frame: Table returned by one of the backends' ``load_reports``.
+        keep_unlabelled: Keep the launches outside every region as well.
+
+    Returns:
+        The table without the unlabelled launches.
+    """
+    if frame.empty or REGION not in frame or keep_unlabelled:
+        return frame
+    region = frame[REGION].fillna("").astype(str)
+    labelled = region.str.len() > 0
+    # Per executable, because "no region anywhere" means something different
+    # (unannotated binary) than "no region on this launch" (bootstrap kernel).
+    annotated = frame[EXECUTABLE].isin(set(frame.loc[labelled, EXECUTABLE]))
+    for name in sorted(set(frame.loc[~annotated, EXECUTABLE].astype(str))):
+        logger.warning(
+            f"{name}: no region on any launch, so every row is kept. Either "
+            "the binary was built without -DPPB_ENABLE_NVTX=ON, or the backend "
+            "cannot see NVTX ranges at all (Nsight Graphics traces a queue "
+            "submission, which carries none)."
+        )
+    dropped = annotated & ~labelled
+    for name in sorted(set(frame.loc[dropped, KERNEL].astype(str))):
+        logger.info(f"Dropping kernel outside every region: {name}")
+    return frame[~dropped].reset_index(drop=True)
+
+
+def select_regions(frame: pd.DataFrame, patterns: list[str]) -> pd.DataFrame:
+    """Keep only the regions whose name matches one of the given patterns.
+
+    Args:
+        frame: Table returned by :func:`filter_regions`.
+        patterns: Regular expressions matched (``re.search``) against the
+            region name; an empty list keeps every region.
+
+    Returns:
+        The table restricted to the matching regions.
+    """
+    if not patterns or frame.empty or REGION not in frame:
         return frame
     compiled = [re.compile(pattern) for pattern in patterns]
-    matched = frame.apply(
-        lambda row: any(
-            expression.search(str(row[KERNEL]))
-            or expression.search(str(row[KERNEL_SIGNATURE]))
-            for expression in compiled
-        ),
-        axis=1,
-    )
-    for name in sorted(set(frame.loc[matched, KERNEL].astype(str))):
-        logger.info(f"Excluding kernel from the plot: {name}")
-    return frame[~matched].reset_index(drop=True)
+    region = frame[REGION].fillna("").astype(str)
+    keep = region.map(lambda name: any(p.search(name) for p in compiled))
+    for name in sorted(set(region[~keep])):
+        logger.info(f"Excluding region from the plot: {name or '(unnamed)'}")
+    return frame[keep].reset_index(drop=True)
 
 
 def aggregate_kernels(frame: pd.DataFrame, mode: str = "sum") -> pd.DataFrame:
     """Collapse the kernel launches of each executable into plot points.
 
+    A region -- ``matmul``, ``init``, ``evaluate`` -- is the unit of work the
+    benchmark named, so it is also the unit the points are grouped by. An
+    implementation with a separate initialization kernel therefore contributes
+    two points, one per phase, rather than one point mixing them.
+
     Args:
         frame: Table returned by :func:`load_reports`.
-        mode: ``sum`` adds up the work and the time of every kernel launch,
-            which places one point per implementation; ``dominant`` keeps only
-            the longest-running kernel; ``none`` keeps every launch.
+        mode: ``sum`` adds up the work and the time of every kernel launch of a
+            region, which places one point per implementation and region;
+            ``dominant`` keeps only the longest-running kernel of each;
+            ``none`` keeps every launch.
 
     Returns:
         The rows to plot, with intensity and performance recomputed for ``sum``.
     """
     if mode == "none" or frame.empty:
         return frame.copy()
+    keys = [EXECUTABLE] + ([REGION] if REGION in frame else [])
     if mode == "dominant":
-        index = frame.groupby(EXECUTABLE)[DURATION].idxmax()
+        index = frame.groupby(keys)[DURATION].idxmax()
         return frame.loc[index].reset_index(drop=True)
 
-    grouped = frame.groupby(EXECUTABLE, as_index=False).agg(
+    grouped = frame.groupby(keys, as_index=False).agg(
         {
             BENCHMARK_PROBLEM: "first",
             PARADIGM: "first",
@@ -381,7 +514,7 @@ def aggregate_kernels(frame: pd.DataFrame, mode: str = "sum") -> pd.DataFrame:
             PEAK_BANDWIDTH: "max",
         }
     )
-    grouped[KERNEL] = "all kernels"
+    grouped[KERNEL] = AGGREGATED_KERNEL
     grouped[PERFORMANCE] = grouped[FLOP] / grouped[DURATION]
     grouped[ARITHMETIC_INTENSITY] = grouped[FLOP] / grouped[MEMORY_TRAFFIC]
     return grouped
