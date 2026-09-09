@@ -15,6 +15,7 @@ from ppbcc.plot.styles import (
     font_points,
     format_relative_log_axis,
     short_metric_label,
+    short_metric_name,
 )
 
 #: Region shading: above the identity line the y metric charges a paradigm
@@ -22,7 +23,7 @@ from ppbcc.plot.styles import (
 ABOVE_LINE_COLOR = "#d62728"
 BELOW_LINE_COLOR = "#1f77b4"
 #: What each half-plane means, in the reader's terms rather than the metrics'.
-ABOVE_LINE_TEXT = "Dense\nVocabulary"
+ABOVE_LINE_TEXT = "Dense\nLines"
 BELOW_LINE_TEXT = "Verbose\nCode"
 LABEL_FONT_SIZE = 8.5
 #: The chart is printed small beside a shared legend, so the axis labels, the
@@ -30,6 +31,11 @@ LABEL_FONT_SIZE = 8.5
 AXIS_LABEL_FONT_SCALE = 1.15
 REGION_FONT_SCALE = 1.25
 MARKER_AREA_SCALE = 1.45
+#: Where the baseline key sits, in axes coordinates. Its top edge starts at
+#: half height so the box grows downwards into the empty lower-right corner,
+#: clearing both the markers and the "Verbose Code" caption below it.
+BASELINE_BOX_POSITION = (0.975, 0.5)
+BASELINE_FONT_SCALE = 1.0
 #: Candidate label offsets in points, tried in order until one is free.
 LABEL_OFFSETS = (
     (12, 0, "left"),
@@ -127,6 +133,38 @@ def _place_labels(
         )
 
 
+def _key_symbol(metric: str) -> str:
+    """Name a metric as compactly as the baseline key allows.
+
+    The axis titles already carry the full name, so the key drops the
+    ``Halstead`` qualifier and keeps the symbol alone. That matters: the key
+    sits over the lower-right half-plane, and every character of width brings
+    it closer to the markers on the identity line.
+
+    Args:
+        metric: Column name from the complexity loader.
+
+    Returns:
+        The bare symbol, for example ``"$D$"`` or ``"SLOC"``.
+    """
+    return short_metric_name(metric).removeprefix("Halstead ")
+
+
+def _format_baseline(value: float) -> str:
+    """Format an absolute complexity value for the baseline key.
+
+    Args:
+        value: Unscaled metric value.
+
+    Returns:
+        A thousands-separated integer for counts such as SLOC, two decimals for
+        derived metrics such as the Halstead difficulty.
+    """
+    if float(value).is_integer():
+        return f"{value:,.0f}"
+    return f"{value:,.2f}"
+
+
 def plot_complexity_comparison(
     data: pd.DataFrame,
     x_metric: str,
@@ -136,6 +174,7 @@ def plot_complexity_comparison(
     log_axes: bool = True,
     show_legends: bool = True,
     show_coefficients: bool = False,
+    baselines: tuple[float, float] | None = None,
 ) -> plt.Figure:
     """Plot two complexity metrics against each other with an identity line.
 
@@ -156,9 +195,13 @@ def plot_complexity_comparison(
             With an external legend the paradigm colors are keyed there, so the
             labels are dropped: they do not survive the reduction to a narrow
             column anyway.
-        show_coefficients: Whether Spearman's rho and Kendall's tau are boxed in
-            the corner. Off by default; the numbers belong in the text, where
-            they can be given to three decimals and discussed.
+        show_coefficients: Whether Spearman's rho and Kendall's tau are added to
+            the baseline key. Off by default; the numbers belong in the text,
+            where they can be given to three decimals and discussed.
+        baselines: Absolute sequential C++ values of ``x_metric`` and
+            ``y_metric``. Both axes are percentages of these, so the key states
+            what 100 % stands for. Omitted when the values are unknown or when
+            several problems with different baselines share one chart.
 
     Returns:
         The Matplotlib figure.
@@ -242,17 +285,26 @@ def plot_complexity_comparison(
         linespacing=1.1,
         zorder=2,
     )
+    key_lines: list[str] = []
+    if baselines is not None:
+        key_lines = [
+            r"$\mathbf{100\,\%}$ means",
+            f"{_key_symbol(x_metric)} = {_format_baseline(baselines[0])}",
+            f"{_key_symbol(y_metric)} = {_format_baseline(baselines[1])}",
+        ]
     if show_coefficients:
         rho = spearmanr(plotted[x_metric], plotted[y_metric]).statistic
         tau = kendalltau(plotted[x_metric], plotted[y_metric]).statistic
+        key_lines += [rf"$\rho={rho:.3f}$", rf"$\tau={tau:.3f}$"]
+    if key_lines:
         axis.text(
-            0.96,
-            0.96,
-            rf"$\rho={rho:.3f}$" "\n" rf"$\tau={tau:.3f}$",
+            *BASELINE_BOX_POSITION,
+            "\n".join(key_lines),
             transform=axis.transAxes,
             va="top",
             ha="right",
-            fontsize=font_points("axes.labelsize"),
+            fontsize=font_points("axes.labelsize", BASELINE_FONT_SCALE),
+            linespacing=1.35,
             bbox={
                 "boxstyle": "round,pad=0.35",
                 "facecolor": "white",

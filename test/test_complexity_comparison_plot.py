@@ -104,7 +104,7 @@ def test_half_planes_are_captioned_for_the_reader():
         _data(), SLOC, DIFFICULTY, "VecAdd", show_legends=False
     )
     texts = {text.get_text() for text in figure.axes[0].texts}
-    assert "Dense\nVocabulary" in texts
+    assert "Dense\nLines" in texts
     assert "Verbose\nCode" in texts
     plt.close(figure)
 
@@ -122,6 +122,82 @@ def test_correlation_coefficients_are_opt_in():
     )
     assert [t for t in shown.axes[0].texts if r"\rho" in t.get_text()]
     plt.close(shown)
+
+
+def _key(figure: plt.Figure) -> str | None:
+    """Return the baseline key of a comparison figure, if it has one."""
+    keys = [
+        text.get_text()
+        for text in figure.axes[0].texts
+        if "means" in text.get_text() or r"\rho" in text.get_text()
+    ]
+    return keys[0] if keys else None
+
+
+def test_baseline_key_states_what_hundred_percent_is():
+    figure = plot_complexity_comparison(
+        _data(),
+        SLOC,
+        DIFFICULTY,
+        "VecAdd",
+        show_legends=False,
+        baselines=(173.0, 102.88),
+    )
+    key = _key(figure)
+    assert key is not None
+    # SLOC is a whole count, the difficulty is not; both are spelled out with
+    # the qualifier dropped so the box stays narrow.
+    assert "SLOC = 173" in key
+    assert "$D$ = 102.88" in key
+    assert "Halstead" not in key
+    plt.close(figure)
+
+
+def test_baseline_key_is_absent_without_baselines():
+    figure = plot_complexity_comparison(
+        _data(), SLOC, DIFFICULTY, "VecAdd", show_legends=False
+    )
+    assert _key(figure) is None
+    plt.close(figure)
+
+
+def test_coefficients_extend_the_baseline_key():
+    figure = plot_complexity_comparison(
+        _data(),
+        SLOC,
+        DIFFICULTY,
+        "VecAdd",
+        show_legends=False,
+        baselines=(173.0, 102.88),
+        show_coefficients=True,
+    )
+    key = _key(figure)
+    assert key is not None
+    # One box, not two: a second one would have to sit somewhere the first
+    # does not, and both corners on that side are already spoken for.
+    assert "SLOC = 173" in key
+    assert r"\rho" in key
+    assert len([t for t in figure.axes[0].texts if "means" in t.get_text()]) == 1
+    plt.close(figure)
+
+
+def test_baseline_key_clears_the_lower_right_caption():
+    figure = plot_complexity_comparison(
+        _data(),
+        SLOC,
+        DIFFICULTY,
+        "VecAdd",
+        show_legends=False,
+        baselines=(173.0, 102.88),
+    )
+    axis = figure.axes[0]
+    figure.canvas.draw()
+    key = next(text for text in axis.texts if "means" in text.get_text())
+    caption = next(text for text in axis.texts if text.get_text() == "Verbose\nCode")
+    key_box = key.get_window_extent(figure.canvas.get_renderer())
+    caption_box = caption.get_window_extent(figure.canvas.get_renderer())
+    assert key_box.y0 > caption_box.y1
+    plt.close(figure)
 
 
 @pytest.mark.parametrize(

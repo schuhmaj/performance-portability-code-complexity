@@ -166,7 +166,8 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
    * - ``--compare-metric``
      - x-axis metric of ``complexity-comparison`` (default: ``sloc``); ``--complexity-metric`` is its y axis
    * - ``--legend-complexity-comparison-coefficients``
-     - Box Spearman's rho and Kendall's tau in ``complexity-comparison`` (off by default)
+     - Add Spearman's rho and Kendall's tau to the ``complexity-comparison``
+       baseline key (off by default)
    * - ``--normalize`` / ``--additive``
      - Divide by, or subtract, the plain-C++ complexity score (mutually exclusive)
    * - ``-s, --size``

@@ -242,6 +242,22 @@ SCALING_SUFFIXES = {
 }
 
 
+def short_metric_name(metric: str) -> str:
+    """Turn a complexity column name into its bare symbol.
+
+    Args:
+        metric: Column name from the complexity loader, for example
+            ``"Halstead Difficulty [normalized]"``.
+
+    Returns:
+        A short name such as ``"Halstead $D$"``, without the scaling suffix. An
+        unrecognised metric keeps its name part, so the caller never loses
+        information it cannot re-derive.
+    """
+    name, _, _ = metric.partition("[")
+    return SHORT_METRIC_NAMES.get(name.strip().casefold(), name.strip())
+
+
 def short_metric_label(metric: str) -> str:
     """Turn a complexity column name into a compact axis title.
 

@@ -21,6 +21,7 @@ from ppbcc.performance_portability.complexity import (
     add_complexity_to_export,
     append_cpp_complexity_row,
     export_metrics_to_csv,
+    load_complexity_baseline,
     load_complexity_data,
     load_complexity_export_data,
     merge_portability_complexity,
@@ -295,9 +296,11 @@ def main(argv: list[str] | None = None) -> int:
 
         comparison_data: pd.DataFrame | None = None
         comparison_labels: tuple[str, str] | None = None
+        comparison_baselines: tuple[float, float] | None = None
         if args.chart == "complexity-comparison":
             assert args.complexity is not None
             comparison_frames: list[pd.DataFrame] = []
+            baseline_sets: set[tuple[float, float]] = set()
             for problem_query, resolved_problem in problem_pairs:
                 problem_pp = portability.loc[
                     portability[PROBLEM] == resolved_problem
@@ -339,6 +342,27 @@ def main(argv: list[str] | None = None) -> int:
                         f"{comparison_labels} and {tuple(labels)}."
                     )
                 comparison_labels = (labels[0], labels[1])
+                baseline_sets.add(
+                    (
+                        load_complexity_baseline(
+                            args.complexity, problem_query, args.compare_metric
+                        ),
+                        load_complexity_baseline(
+                            args.complexity,
+                            problem_query,
+                            args.complexity_metric,
+                        ),
+                    )
+                )
+            # Percentages of two different baselines cannot be keyed by one
+            # box, so a multi-problem chart states no absolute values at all.
+            if len(baseline_sets) == 1:
+                comparison_baselines = baseline_sets.pop()
+            elif baseline_sets:
+                logger.info(
+                    "Problems have different CPP baselines; the comparison "
+                    "chart omits the absolute reference values."
+                )
             comparison_data = pd.concat(comparison_frames, ignore_index=True)
             logger.debug(
                 f"Comparison data:\n{comparison_data.to_string(index=False)}"
@@ -428,6 +452,7 @@ def main(argv: list[str] | None = None) -> int:
                 log_axes=args.log_complexity,
                 show_legends=not args.legend,
                 show_coefficients=args.legend_comparison_coefficients,
+                baselines=comparison_baselines,
             )
         elif args.chart == "heatmap":
             figure = plot_efficiency_heatmap(

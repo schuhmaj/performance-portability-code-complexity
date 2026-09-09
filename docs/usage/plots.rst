@@ -142,9 +142,9 @@ Complexity comparison
 ``complexity-comparison`` answers whether two complexity metrics rank the
 paradigms differently. Each paradigm is one marker, both axes are relative to
 the plain-C++ baseline, and the identity line splits the plane: above it the
-y-axis metric charges a paradigm more than the x-axis one — *dense vocabulary* —
-and below it the x-axis metric charges more — *verbose code*, which is how the
-two half-planes are captioned.
+y-axis metric charges a paradigm more than the x-axis one — *dense lines* — and
+below it the x-axis metric charges more — *verbose code*, which is how the two
+half-planes are captioned.
 
 .. code-block:: bash
 
@@ -160,10 +160,17 @@ only means something on a shared relative scale, the chart always normalizes
 and rejects ``--additive``. ``-l`` suppresses the in-plot legend *and* the
 per-point paradigm labels, for placing the chart next to a shared legend.
 
+A key on the right states the absolute plain-C++ values behind the 100 % of
+both axes, so the chart can be read without the running text. It hangs from
+half height into the lower-right corner, which the markers leave free because a
+paradigm below the identity line on one axis is rarely far below it on the
+other. A chart spanning several problems has several baselines and therefore no
+key.
+
 Spearman's :math:`\rho` and Kendall's :math:`\tau` are not drawn by default;
-``--legend-complexity-comparison-coefficients`` boxes them in the corner. Since
-points hug the identity line, no corner is reliably empty, so the box is drawn
-under the markers rather than over them.
+``--legend-complexity-comparison-coefficients`` appends them to that key rather
+than opening a second box. They belong in the running text, where they can be
+given to three decimals and discussed.
 
 Efficiency heatmap
 ------------------
