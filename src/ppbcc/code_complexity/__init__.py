@@ -28,6 +28,7 @@ from .config import (
 )
 from .detection import detect_dialects
 from .evaluate import analyze_source, collect_source_files, evaluate
+from .exclude import Exclusions, is_excluded_file, strip_excluded
 from .halstead import HalsteadMetrics
 from .loc import LineMetrics, count_lines
 from .report import (
@@ -51,6 +52,7 @@ __all__ = [
     "DIFF_COLUMNS",
     "DialectRegistry",
     "DialectSpec",
+    "Exclusions",
     "HALSTEAD_COLUMNS",
     "HalsteadMetrics",
     "LOC_COLUMNS",
@@ -67,10 +69,12 @@ __all__ = [
     "detect_dialects",
     "evaluate",
     "extract_namespace_aliases",
+    "is_excluded_file",
     "load_cpp_keywords",
     "load_dialects",
     "resolve_metric_columns",
     "save_csv",
+    "strip_excluded",
     "tokenize",
     "__version__",
 ]

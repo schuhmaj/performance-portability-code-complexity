@@ -116,6 +116,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="append a TOTAL row aggregating all analysed files",
     )
     parser.add_argument(
+        "--exclude-macro",
+        nargs="+",
+        default=None,
+        metavar="REGEX",
+        help=(
+            "macros to disregard, as regular expressions matched against the whole name: "
+            "their invocations are removed and conditionals on them are resolved as if "
+            r"they were undefined, e.g. 'PPB_MARKER_\w+'"
+        ),
+    )
+    parser.add_argument(
+        "--exclude-header",
+        nargs="+",
+        default=None,
+        metavar="GLOB",
+        help=(
+            "headers to disregard, as glob patterns matched against an #include and the "
+            "tail of a file path: they are not analysed and their #include lines are "
+            "removed, e.g. 'common/Marker.h'"
+        ),
+    )
+    parser.add_argument(
         "--table-format",
         default="rounded_outline",
         metavar="FMT",
@@ -195,6 +217,8 @@ def main(argv: list[str] | None = None) -> int:
             csv_separator=args.csv_separator,
             keywords_path=args.keywords_config,
             dialects_path=args.dialects_config,
+            exclude_macros=args.exclude_macro,
+            exclude_headers=args.exclude_header,
         )
     except (FileNotFoundError, KeyError, ValueError) as error:
         message = error.args[0] if error.args else error

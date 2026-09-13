@@ -13,6 +13,12 @@ Analysis Pipeline
 .. automodule:: ppbcc.code_complexity.evaluate
    :members:
 
+Exclusions
+----------
+
+.. automodule:: ppbcc.code_complexity.exclude
+   :members:
+
 Tokenizer
 ---------
 

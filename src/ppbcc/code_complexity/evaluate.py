@@ -18,6 +18,7 @@ from .config import (
     load_dialects,
 )
 from .detection import detect_dialects
+from .exclude import Exclusions, is_excluded_file, strip_excluded
 from .halstead import HalsteadMetrics
 from .loc import LineMetrics, count_lines
 from .report import DIFF_COLUMNS, save_csv, to_dataframe
@@ -151,6 +152,8 @@ def evaluate(
     csv_separator: str = ",",
     keywords_path: Path | None = None,
     dialects_path: Path | None = None,
+    exclude_macros: list[str] | None = None,
+    exclude_headers: list[str] | None = None,
 ) -> pd.DataFrame:
     """Runs the complexity analysis - the library's top-level entry point.
 
@@ -172,6 +175,11 @@ def evaluate(
         keywords_path: Optional override for the packaged
             ``cpp_keywords.toml``.
         dialects_path: Optional override for the packaged ``dialects.toml``.
+        exclude_macros: Regular expressions for macro names whose invocations
+            and conditionals are removed before the analysis, e.g.
+            ``["PPB_MARKER_\\w+"]`` (see :mod:`ppbcc.code_complexity.exclude`).
+        exclude_headers: Glob patterns for headers which are neither analysed
+            nor counted where they are included, e.g. ``["common/Marker.h"]``.
 
     Returns:
         DataFrame with one row per source file (plus the optional ``TOTAL``
@@ -180,10 +188,12 @@ def evaluate(
     Raises:
         FileNotFoundError: If a source path does not exist.
         KeyError: If ``language_dialect`` names an unknown dialect.
-        ValueError: If ``metrics`` contains an unknown metric name.
+        ValueError: If ``metrics`` contains an unknown metric name, or a macro
+            pattern is not a valid regular expression.
     """
     keywords = load_cpp_keywords(keywords_path)
     registry = load_dialects(dialects_path)
+    exclusions = Exclusions.create(exclude_macros, exclude_headers)
 
     forced_dialects: list[DialectSpec] | None = None
     if language_dialect.strip().lower() != AUTO_DIALECT_NAME:
@@ -196,6 +206,11 @@ def evaluate(
         logger.info("Analyzing with automatic per-file dialect detection")
 
     files = collect_source_files(sources)
+    if exclusions.headers:
+        excluded = [path for path in files if is_excluded_file(path, exclusions)]
+        if excluded:
+            logger.info("Excluding {} header(s): {}", len(excluded), ", ".join(map(str, excluded)))
+            files = [path for path in files if path not in excluded]
     if not files:
         logger.warning("No source files found in {}", [str(s) for s in sources])
     logger.info("Analyzing {} source file(s)", len(files))
@@ -205,7 +220,7 @@ def evaluate(
     total_lines = LineMetrics(0, 0, 0, 0)
     all_dialects: set[str] = set()
     for path in files:
-        code = path.read_text(encoding="utf-8", errors="replace")
+        code = strip_excluded(path.read_text(encoding="utf-8", errors="replace"), exclusions, str(path))
         counts, lines, dialect_names = analyze_source(
             code, path, keywords, registry, forced_dialects
         )

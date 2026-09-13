@@ -36,6 +36,11 @@ Command line
     # Aggregate all files into an additional TOTAL row:
     ppbcc code-complexity src/cuda -d cuda --aggregate
 
+    # Disregard instrumentation: invocations of and conditionals on the matching
+    # macros, and the headers defining them (see "Excluding code" below):
+    ppbcc code-complexity src --exclude-macro 'PPB_MARKER_\w+' PPB_PROFILING \
+        --exclude-header common/Marker.h common/Profiling.h
+
     # More logging: -v (DEBUG), -vv (TRACE); the default level is INFO.
     ppbcc code-complexity src -vv
 
@@ -82,6 +87,46 @@ Python API
     print(frame[["file", "dialect", "effort", "delta_effort"]])
 
 The result is a :class:`pandas.DataFrame` with one row per file.
+
+.. _code-complexity-exclusions:
+
+Excluding code
+--------------
+
+A benchmark usually carries code which is not part of the algorithm under
+study, profiler region markers being the typical example. Counted as-is, it
+inflates every implementation by the same boilerplate. Two exclusions remove
+such code *before* the analysis, so the metrics are those of the program as if
+it had never been added:
+
+``--exclude-macro REGEX ...`` / ``exclude_macros``
+    Regular expressions matched against whole macro names.
+
+    * An invocation is removed together with its argument list and a directly
+      following ``;`` — ``PPB_MARKER_GPU_SCOPE("evaluate");`` disappears.
+    * A conditional on the macro (``#ifdef``, ``#ifndef``, ``#if defined(...)``,
+      ``#if !defined(...)``, ``#if NAME``) is resolved as if the macro was
+      undefined: the branch the preprocessor would drop goes, the other branch
+      stays, and so does an ``#elif`` that takes over. A condition which
+      combines the macro with others is left untouched, with a warning.
+
+``--exclude-header GLOB ...`` / ``exclude_headers``
+    Glob patterns matched against the spelling of an ``#include`` and against
+    the tail of a file path. The header is not analysed, and its ``#include``
+    lines are removed.
+
+A line which held nothing but removed code — and possibly a comment behind it —
+is removed as a whole, so ``loc`` and ``sloc`` shrink along with the Halstead
+counts. Ordinary functions are not touched: a call such as
+``profiling::initialize(&argc, argv)`` is code like any other.
+
+.. code-block:: python
+
+    frame = evaluate(
+        sources=[Path("src/")],
+        exclude_macros=[r"PPB_MARKER_\w+", "PPB_PROFILING"],
+        exclude_headers=["common/Marker.h", "common/Profiling.h"],
+    )
 
 .. _code-complexity-metric-definitions:
 
@@ -295,6 +340,13 @@ counts are implementation-wide instead of a sum of per-file counts:
         aggregate=True,
     )
     total = frame.loc[frame["file"] == "TOTAL"].iloc[0]
+
+Instrumentation which is not part of any implementation is excluded in the
+same call (see :ref:`code-complexity-exclusions`); the script passes its
+profiler region macros and headers as
+``exclude_macros=[r"PPB_MARKER_\w+", "PPB_PROFILING", ...]`` and
+``exclude_headers=["common/Marker.h", "common/Profiling.h"]``, and skips those
+headers when it resolves the local includes.
 
 .. important::
 

@@ -51,6 +51,11 @@ class Token:
             from ``line`` only for multi-line comments/raw strings).
         pragma: First word of the surrounding ``#pragma`` line (e.g.
             ``"omp"``) if the token is part of one, otherwise ``None``.
+        start: Offset of the token's first character in the source text
+            (for a directive, the offset of its ``#``), or ``-1`` for a token
+            built by hand. Not part of the token's equality.
+        end: Offset one past the token's last character, or ``-1``. Not part
+            of the token's equality.
     """
 
     kind: TokenKind
@@ -58,6 +63,8 @@ class Token:
     line: int
     end_line: int = 0
     pragma: str | None = None
+    start: int = field(default=-1, compare=False, repr=False)
+    end: int = field(default=-1, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         """Defaults ``end_line`` to ``line`` when not provided."""
@@ -144,6 +151,7 @@ def tokenize(code: str) -> list[Token]:
     at_line_start = True
     hash_pending = False           # a line-initial '#' awaiting its directive name
     hash_line = 0
+    hash_start = 0
     pragma_directive: Token | None = None  # the '#pragma' token awaiting its first word
     pragma_prefix: str | None = None       # first word of the active pragma line
     continuation = False           # backslash directly before the newline
@@ -163,7 +171,9 @@ def tokenize(code: str) -> list[Token]:
                 pragma_directive = None
                 pragma_prefix = None
                 if hash_pending:  # stray '#' at end of line
-                    tokens.append(Token(TokenKind.PUNCT, "#", start_line))
+                    tokens.append(
+                        Token(TokenKind.PUNCT, "#", start_line, start=hash_start, end=hash_start + 1)
+                    )
                     hash_pending = False
             at_line_start = True
             continue
@@ -173,12 +183,15 @@ def tokenize(code: str) -> list[Token]:
         continuation = False
 
         if kind in ("block_comment", "line_comment"):
-            tokens.append(Token(TokenKind.COMMENT, text, start_line, line))
+            tokens.append(
+                Token(TokenKind.COMMENT, text, start_line, line, start=match.start(), end=match.end())
+            )
             continue
 
         if kind == "punct" and text == "#" and at_line_start:
             hash_pending = True
             hash_line = start_line
+            hash_start = match.start()
             at_line_start = False
             continue
         at_line_start = False
@@ -186,15 +199,25 @@ def tokenize(code: str) -> list[Token]:
         if hash_pending:
             hash_pending = False
             if kind == "ident":
-                directive = Token(TokenKind.DIRECTIVE, f"#{text}", hash_line)
+                directive = Token(
+                    TokenKind.DIRECTIVE, f"#{text}", hash_line, start=hash_start, end=match.end()
+                )
                 tokens.append(directive)
                 if text == "pragma":
                     pragma_directive = directive
                 continue
             # '#' not followed by a name: emit it as plain punctuation.
-            tokens.append(Token(TokenKind.PUNCT, "#", hash_line))
+            tokens.append(Token(TokenKind.PUNCT, "#", hash_line, start=hash_start, end=hash_start + 1))
 
-        token = Token(_TOKEN_KIND_BY_GROUP[kind], text, start_line, line, pragma=pragma_prefix)
+        token = Token(
+            _TOKEN_KIND_BY_GROUP[kind],
+            text,
+            start_line,
+            line,
+            pragma=pragma_prefix,
+            start=match.start(),
+            end=match.end(),
+        )
         if kind == "other":
             logger.trace("Unexpected character {!r} in line {}", text, start_line)
             token.kind = TokenKind.PUNCT

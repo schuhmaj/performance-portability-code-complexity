@@ -102,6 +102,8 @@ Halstead complexity and LOC/SLOC metrics for C++ and GPU-enriched C++.
 | `-m, --metrics` | Metric selection, e.g. `halstead`, `loc`, `sloc`, `dialect` (default: all) |
 | `--diff` | Adds `baseline_*`/`delta_*` columns: metrics of the code with all dialect tokens removed, and the difference against that baseline |
 | `--aggregate` | Appends a `TOTAL` row (operator/operand sets are merged before recomputing, so distinct counts are project-wide) |
+| `--exclude-macro` | Regexes of macro names to disregard: invocations are removed and conditionals on them are resolved as if undefined, e.g. `'PPB_MARKER_\w+'` |
+| `--exclude-header` | Globs of headers to disregard: they are not analysed and their `#include` lines are removed, e.g. `common/Marker.h` |
 | `-o, --output` | CSV output path (`--csv-separator` changes the separator) |
 | `--list-dialects` | List all known dialects and their aliases, then exit |
 
