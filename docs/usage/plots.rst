@@ -33,19 +33,21 @@ below for the same benchmark problem, so they can be compared directly.
 Chart overview
 --------------
 
-+----------------+--------------------------------------------------+-------------------+
-| Chart          | Shows                                            | Needs complexity? |
-+================+==================================================+===================+
-| ``cascade``    | Efficiency decay across ranked platforms + PP    | no                |
-+----------------+--------------------------------------------------+-------------------+
-| ``navchart``   | PP against code complexity                       | **yes**           |
-+----------------+--------------------------------------------------+-------------------+
-| ``combined``   | Cascade + Navchart + size scaling in one figure  | **yes**           |
-+----------------+--------------------------------------------------+-------------------+
-| ``heatmap``    | Efficiency per paradigm and platform             | no                |
-+----------------+--------------------------------------------------+-------------------+
-| ``boxplot``    | Efficiency distribution per paradigm             | no                |
-+----------------+--------------------------------------------------+-------------------+
++---------------------------+-------------------------------------------------+-------------------+
+| Chart                     | Shows                                           | Needs complexity? |
++===========================+=================================================+===================+
+| ``cascade``               | Efficiency decay across ranked platforms + PP   | no                |
++---------------------------+-------------------------------------------------+-------------------+
+| ``navchart``              | PP against code complexity                      | **yes**           |
++---------------------------+-------------------------------------------------+-------------------+
+| ``combined``              | Cascade + Navchart + size scaling in one figure | **yes**           |
++---------------------------+-------------------------------------------------+-------------------+
+| ``complexity-comparison`` | Two complexity metrics against each other       | **yes**           |
++---------------------------+-------------------------------------------------+-------------------+
+| ``heatmap``               | Efficiency per paradigm and platform            | no                |
++---------------------------+-------------------------------------------------+-------------------+
+| ``boxplot``               | Efficiency distribution per paradigm            | no                |
++---------------------------+-------------------------------------------------+-------------------+
 
 Cascade plot
 ------------
@@ -104,19 +106,71 @@ one to put in a paper when you have room for exactly one figure.
    :width: 100%
    :class: plot-figure
 
-   ``-c combined`` — Cascade, Navchart (additive complexity), and scaling over
-   problem size.
+   ``-c combined`` — Cascade, Navchart (normalized complexity), and performance
+   portability over problem size.
 
 .. code-block:: bash
 
     ppbcc p3analysis MatrixMultiplication ./Results_* \
       --complexity ./code-complexity/code-complexity.csv -c combined \
-      --complexity-metric halstead-difficulty --additive --log-size \
+      --complexity-metric halstead-difficulty --normalize --log-complexity \
       --non-zero-pp --remove-description -s avg -x "Cublas"
 
-``--additive`` puts the Navchart panel on a *complexity added over plain C++*
-axis. ``--log-size`` applies only to the scaling panel and is therefore valid
-for the combined chart only.
+``--normalize`` puts the Navchart panel on a *percentage of plain C++* axis.
+Every value is then positive, which is what makes ``--log-complexity`` usable —
+and the log axis matters whenever one implementation dwarfs the rest, as the
+two CUDA polyhedral implementations do at roughly 500 % of the baseline.
+``--additive`` remains available and ranks paradigms identically, but can yield
+non-positive values that a logarithmic axis cannot show.
+
+The scaling panel is a **heatmap** over the benchmark sizes, one row per
+implementation and one column per size, because a line per implementation
+becomes unreadable beyond a handful of paradigms. Its rows keep the
+descending-:math:`\Phi` order of the platform-ranking panel beside it, so the
+two lower panels line up row for row. ``--log-size`` is consequently obsolete:
+the axis is categorical, and the option is accepted but ignored with a warning.
+
+Column labels become exponents whenever every size is an exact power of one
+base — :math:`2^5 \ldots 2^{14}`, :math:`10^1 \ldots 10^8` — which is short
+enough to carry the same font size as the cell values. A sweep that is not a
+clean power sequence keeps decimal labels at a smaller size, since upright
+labels that long would grow the figure's bounding box.
+
+Complexity comparison
+---------------------
+
+``complexity-comparison`` answers whether two complexity metrics rank the
+paradigms differently. Each paradigm is one marker, both axes are relative to
+the plain-C++ baseline, and the identity line splits the plane: above it the
+y-axis metric charges a paradigm more than the x-axis one — *dense lines* — and
+below it the x-axis metric charges more — *verbose code*, which is how the two
+half-planes are captioned.
+
+.. code-block:: bash
+
+    ppbcc p3analysis MatrixMultiplication ./Results_* \
+      --complexity ./code-complexity/code-complexity.csv \
+      -c complexity-comparison --complexity-metric halstead-difficulty \
+      --compare-metric sloc --log-complexity \
+      --non-zero-pp --remove-description -s avg -x "Cublas"
+
+``--compare-metric`` names the x-axis metric and ``--complexity-metric`` the y
+axis; both take the usual metric names and aliases. Because the identity line
+only means something on a shared relative scale, the chart always normalizes
+and rejects ``--additive``. ``-l`` suppresses the in-plot legend *and* the
+per-point paradigm labels, for placing the chart next to a shared legend.
+
+A key on the right states the absolute plain-C++ values behind the 100 % of
+both axes, so the chart can be read without the running text. It hangs from
+half height into the lower-right corner, which the markers leave free because a
+paradigm below the identity line on one axis is rarely far below it on the
+other. A chart spanning several problems has several baselines and therefore no
+key.
+
+Spearman's :math:`\rho` and Kendall's :math:`\tau` are not drawn by default;
+``--legend-complexity-comparison-coefficients`` appends them to that key rather
+than opening a second box. They belong in the running text, where they can be
+given to three decimals and discussed.
 
 Efficiency heatmap
 ------------------

@@ -14,6 +14,7 @@ from ppbcc.plot.styles import (
     _framework_colors,
     _problem_legend_handles,
     _problem_markers,
+    short_metric_label,
 )
 
 
@@ -62,7 +63,7 @@ def plot_navchart(
             **marker_options,
         )
 
-    axis.set_xlabel(metric)
+    axis.set_xlabel(short_metric_label(metric))
     axis.set_ylabel(PP_SYMBOL)
     axis.set_ylim(0.0, 1.05)
     figure.suptitle(f"{problem_title} {PP_SYMBOL} - Code Complexity")

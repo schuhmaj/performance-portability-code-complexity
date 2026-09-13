@@ -16,6 +16,10 @@ from ppbcc.constants import (
     TIME_UNIT,
     WALL_CLOCK_TIME,
 )
+from ppbcc.performance_portability.complexity import (
+    load_complexity_baseline,
+    load_complexity_data,
+)
 from ppbcc.performance_portability.metrics import calculate_metrics
 from ppbcc.performance_portability.options import build_parser
 from ppbcc.performance_portability.selection import (
@@ -119,3 +123,48 @@ def test_boxplot_rejects_summary_size_literals(literal, tmp_path):
         )
         == 1
     )
+
+
+def _complexity_csv(tmp_path):
+    """Write a minimal complexity CSV with a CPP reference row."""
+    path = tmp_path / "code-complexity.csv"
+    pd.DataFrame(
+        [
+            ["VecAdd", "CPP", 173, 102.88],
+            ["VecAdd", "Kokkos", 187, 118.5],
+            ["VecAdd", "OpenCL", 303, 225.4],
+        ],
+        columns=["Name", "Framework", "SLOC", "Halstead Difficulty"],
+    ).to_csv(path, index=False)
+    return path
+
+
+def test_baseline_reports_the_unscaled_cpp_value(tmp_path):
+    path = _complexity_csv(tmp_path)
+    assert load_complexity_baseline(path, "VecAdd", "sloc") == 173.0
+    assert load_complexity_baseline(
+        path, "VecAdd", "halstead-difficulty"
+    ) == pytest.approx(102.88)
+
+
+def test_baseline_matches_the_hundred_percent_of_normalized_data(tmp_path):
+    path = _complexity_csv(tmp_path)
+    normalized, label = load_complexity_data(
+        path, "VecAdd", "sloc", normalize=True, additive=False
+    )
+    baseline = load_complexity_baseline(path, "VecAdd", "sloc")
+    cpp = normalized.loc[normalized["Framework"] == "CPP", label]
+    assert float(cpp.iloc[0]) == pytest.approx(100.0)
+    # The key on the plot claims this equivalence, so assert it directly.
+    other = normalized.loc[normalized["Framework"] == "OpenCL", label]
+    assert float(other.iloc[0]) == pytest.approx(303.0 / baseline * 100.0)
+
+
+def test_baseline_requires_a_cpp_row(tmp_path):
+    path = tmp_path / "no-cpp.csv"
+    pd.DataFrame(
+        [["VecAdd", "Kokkos", 187, 118.5]],
+        columns=["Name", "Framework", "SLOC", "Halstead Difficulty"],
+    ).to_csv(path, index=False)
+    with pytest.raises(ValueError, match="exactly one CPP"):
+        load_complexity_baseline(path, "VecAdd", "sloc")

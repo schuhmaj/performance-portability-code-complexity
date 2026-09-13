@@ -38,6 +38,9 @@ METRIC_ALIASES = {
     "e": "Halstead Effort",
 }
 
+#: Framework labels that name the sequential C++ reference implementation.
+CPP_TOKENS = frozenset({"cpp", "cplusplus", "cpu"})
+
 
 def _normalize_token(value: str) -> str:
     """Normalize a framework label for case-insensitive matching.
@@ -134,6 +137,98 @@ def resolve_complexity_metric(
     return enriched, canonical
 
 
+def _select_complexity(
+    path: Path,
+    problem_query: str,
+    metric_request: str,
+) -> tuple[pd.DataFrame, str, str]:
+    """Load one problem's complexity rows and reduce them to one metric.
+
+    Args:
+        path: Complexity CSV path.
+        problem_query: User-supplied benchmark problem query.
+        metric_request: Requested metric or alias.
+
+    Returns:
+        The per-framework median of the resolved metric, that metric's column
+        name, and the resolved problem name.
+
+    Raises:
+        FileNotFoundError: If ``path`` does not exist.
+        ValueError: If the input is invalid.
+    """
+    if not path.is_file():
+        raise FileNotFoundError(f"Complexity CSV does not exist: {path}")
+    raw = pd.read_csv(path)
+    _require_columns(raw, [COMPLEXITY_NAME, COMPLEXITY_FRAMEWORK], path)
+    problem = _resolve_unique_value(
+        raw[COMPLEXITY_NAME], problem_query, "complexity problem"
+    )
+    selected = raw.loc[raw[COMPLEXITY_NAME] == problem].copy()
+    selected[COMPLEXITY_FRAMEWORK] = (
+        selected[COMPLEXITY_FRAMEWORK].fillna("").astype(str).str.strip()
+    )
+    selected, metric = resolve_complexity_metric(selected, metric_request, path)
+    selected = (
+        selected.groupby(COMPLEXITY_FRAMEWORK, as_index=False)[metric]
+        .median()
+        .dropna(subset=[metric])
+    )
+    return selected, metric, problem
+
+
+def _cpp_baseline(selected: pd.DataFrame, metric: str, problem: str) -> float:
+    """Return the sequential C++ value of ``metric``.
+
+    Args:
+        selected: Per-framework complexity values.
+        metric: Metric column to read.
+        problem: Problem name, used in error messages.
+
+    Returns:
+        The CPP reference value.
+
+    Raises:
+        ValueError: If there is not exactly one CPP row.
+    """
+    tokens = selected[COMPLEXITY_FRAMEWORK].map(_normalize_token)
+    baseline_rows = selected.loc[tokens.isin(CPP_TOKENS), metric]
+    if len(baseline_rows) != 1:
+        raise ValueError(
+            "Scaling against the CPP baseline requires exactly one CPP "
+            f"complexity row for {problem}; found {len(baseline_rows)}."
+        )
+    return float(baseline_rows.iloc[0])
+
+
+def load_complexity_baseline(
+    path: Path,
+    problem_query: str,
+    metric_request: str,
+) -> float:
+    """Load the absolute sequential C++ value of one complexity metric.
+
+    Normalized data says only that CPP is 100 %; a plot that wants to state
+    what 100 % stands for has to read the unscaled value back out.
+
+    Args:
+        path: Complexity CSV path.
+        problem_query: User-supplied benchmark problem query.
+        metric_request: Requested metric or alias.
+
+    Returns:
+        The CPP value of the resolved metric, unscaled.
+
+    Raises:
+        FileNotFoundError: If ``path`` does not exist.
+        ValueError: If the input is invalid or no CPP baseline is available.
+    """
+    selected, metric, problem = _select_complexity(
+        path, problem_query, metric_request
+    )
+    return _cpp_baseline(selected, metric, problem)
+
+
 def load_complexity_data(
     path: Path,
     problem_query: str,
@@ -157,36 +252,14 @@ def load_complexity_data(
         FileNotFoundError: If ``path`` does not exist.
         ValueError: If the input is invalid or no CPP baseline is available.
     """
-    if not path.is_file():
-        raise FileNotFoundError(f"Complexity CSV does not exist: {path}")
-    raw = pd.read_csv(path)
-    _require_columns(raw, [COMPLEXITY_NAME, COMPLEXITY_FRAMEWORK], path)
-    problem = _resolve_unique_value(
-        raw[COMPLEXITY_NAME], problem_query, "complexity problem"
-    )
-    selected = raw.loc[raw[COMPLEXITY_NAME] == problem].copy()
-    selected[COMPLEXITY_FRAMEWORK] = (
-        selected[COMPLEXITY_FRAMEWORK].fillna("").astype(str).str.strip()
-    )
-    selected, metric = resolve_complexity_metric(selected, metric_request, path)
-    selected = (
-        selected.groupby(COMPLEXITY_FRAMEWORK, as_index=False)[metric]
-        .median()
-        .dropna(subset=[metric])
+    selected, metric, problem = _select_complexity(
+        path, problem_query, metric_request
     )
 
     display_metric = "Source Lines of Code" if metric == "SLOC" else metric
     label = f"{display_metric} [absolute]"
     if normalize or additive:
-        tokens = selected[COMPLEXITY_FRAMEWORK].map(_normalize_token)
-        baseline_rows = selected.loc[tokens.isin({"cpp", "cplusplus", "cpu"}), metric]
-        if len(baseline_rows) != 1:
-            raise ValueError(
-                f"--{'normalize' if normalize else 'additive'} requires exactly "
-                "one CPP complexity row "
-                f"for {problem}; found {len(baseline_rows)}."
-            )
-        baseline = float(baseline_rows.iloc[0])
+        baseline = _cpp_baseline(selected, metric, problem)
         if normalize:
             if baseline <= 0.0:
                 raise ValueError(
@@ -410,12 +483,11 @@ def append_cpp_complexity_row(
     measurements. Its size, precision, hardware, and performance metric cells
     therefore remain empty in both exported datasets.
     """
-    cpp_tokens = {"cpp", "cplusplus", "cpu"}
     cpp_rows = complexity.loc[
         complexity[COMPLEXITY_FRAMEWORK]
         .astype(str)
         .map(_normalize_token)
-        .isin(cpp_tokens)
+        .isin(CPP_TOKENS)
     ]
     if cpp_rows.empty:
         logger.warning(f"No CPP complexity row available for {problem}")

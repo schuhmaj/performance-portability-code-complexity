@@ -21,6 +21,7 @@ from ppbcc.performance_portability.complexity import (
     add_complexity_to_export,
     append_cpp_complexity_row,
     export_metrics_to_csv,
+    load_complexity_baseline,
     load_complexity_data,
     load_complexity_export_data,
     merge_portability_complexity,
@@ -45,6 +46,7 @@ from ppbcc.performance_portability.selection import (
     select_problem_rows,
 )
 from ppbcc.plot.cascade import plot_cascade
+from ppbcc.plot.complexity_comparison import plot_complexity_comparison
 from ppbcc.plot.heatmap import (
     plot_efficiency_boxplot,
     plot_efficiency_heatmap,
@@ -75,8 +77,25 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--hardware is only valid for boxplot charts.")
         if args.legend_vertical and not args.legend:
             raise ValueError("--legend--vertical requires -l/--legend.")
-        if args.chart in {"navchart", "combined"} and args.complexity is None:
+        if (
+            args.chart in {"navchart", "combined", "complexity-comparison"}
+            and args.complexity is None
+        ):
             raise ValueError(f"--chart {args.chart} requires --complexity.")
+        if (
+            args.legend_comparison_coefficients
+            and args.chart != "complexity-comparison"
+        ):
+            raise ValueError(
+                "--legend-complexity-comparison-coefficients is only valid for "
+                "--chart complexity-comparison."
+            )
+        if args.chart == "complexity-comparison" and args.additive:
+            raise ValueError(
+                "--chart complexity-comparison compares two metrics on one "
+                "shared scale, which requires --normalize; --additive leaves "
+                "them in their own units."
+            )
         if args.chart == "boxplot" and args.size in {
             AVERAGE_SIZE,
             BEST_SIZE,
@@ -87,20 +106,29 @@ def main(argv: list[str] | None = None) -> int:
                 f"{args.size!r} collapses the efficiency distribution."
             )
         if (args.normalize or args.additive) and (
-            args.complexity is None or args.chart not in {"navchart", "combined"}
+            args.complexity is None
+            or args.chart not in {"navchart", "combined", "complexity-comparison"}
         ):
             raise ValueError(
-                "--normalize/--additive are only valid for navchart/combined "
-                "with --complexity."
+                "--normalize/--additive are only valid for navchart, combined "
+                "and complexity-comparison with --complexity."
             )
-        if args.log_complexity and args.chart not in {"navchart", "combined"}:
+        if args.log_complexity and args.chart not in {
+            "navchart",
+            "combined",
+            "complexity-comparison",
+        }:
             raise ValueError(
-                "--log-complexity is only valid for navchart/combined charts."
+                "--log-complexity is only valid for navchart, combined and "
+                "complexity-comparison charts."
             )
-        if args.log_size and args.chart != "combined":
-            raise ValueError("--log-size is only valid for combined charts.")
+        if args.log_size:
+            logger.warning(
+                "--log-size is deprecated and ignored: the combined scaling "
+                "panel is now a heatmap over the discrete benchmark sizes."
+            )
         if (
-            args.chart not in {"navchart", "combined"}
+            args.chart not in {"navchart", "combined", "complexity-comparison"}
             and args.complexity is not None
             and not args.export_to_csv
         ):
@@ -266,6 +294,80 @@ def main(argv: list[str] | None = None) -> int:
                     "to be positive."
                 )
 
+        comparison_data: pd.DataFrame | None = None
+        comparison_labels: tuple[str, str] | None = None
+        comparison_baselines: tuple[float, float] | None = None
+        if args.chart == "complexity-comparison":
+            assert args.complexity is not None
+            comparison_frames: list[pd.DataFrame] = []
+            baseline_sets: set[tuple[float, float]] = set()
+            for problem_query, resolved_problem in problem_pairs:
+                problem_pp = portability.loc[
+                    portability[PROBLEM] == resolved_problem
+                ].drop(columns=PROBLEM)
+                merged: pd.DataFrame | None = None
+                labels: list[str] = []
+                for request in (args.compare_metric, args.complexity_metric):
+                    # Both metrics are taken relative to the CPP baseline so
+                    # they share one dimensionless scale and the identity line
+                    # of the comparison chart is meaningful.
+                    complexity, label = load_complexity_data(
+                        args.complexity,
+                        problem_query,
+                        request,
+                        normalize=True,
+                        additive=False,
+                    )
+                    labels.append(label)
+                    matched = merge_portability_complexity(
+                        problem_pp, complexity, label
+                    ).drop(columns=PERFORMANCE_PORTABILITY)
+                    merged = (
+                        matched
+                        if merged is None
+                        else merged.merge(matched, on=APPLICATION, how="inner")
+                    )
+                if labels[0] == labels[1]:
+                    raise ValueError(
+                        "--chart complexity-comparison needs two different "
+                        f"metrics; --compare-metric and --complexity-metric "
+                        f"both resolve to {labels[0]!r}."
+                    )
+                assert merged is not None
+                merged.insert(0, PROBLEM, resolved_problem)
+                comparison_frames.append(merged)
+                if comparison_labels is not None and comparison_labels != tuple(labels):
+                    raise ValueError(
+                        "Complexity metric labels differ between problems: "
+                        f"{comparison_labels} and {tuple(labels)}."
+                    )
+                comparison_labels = (labels[0], labels[1])
+                baseline_sets.add(
+                    (
+                        load_complexity_baseline(
+                            args.complexity, problem_query, args.compare_metric
+                        ),
+                        load_complexity_baseline(
+                            args.complexity,
+                            problem_query,
+                            args.complexity_metric,
+                        ),
+                    )
+                )
+            # Percentages of two different baselines cannot be keyed by one
+            # box, so a multi-problem chart states no absolute values at all.
+            if len(baseline_sets) == 1:
+                comparison_baselines = baseline_sets.pop()
+            elif baseline_sets:
+                logger.info(
+                    "Problems have different CPP baselines; the comparison "
+                    "chart omits the absolute reference values."
+                )
+            comparison_data = pd.concat(comparison_frames, ignore_index=True)
+            logger.debug(
+                f"Comparison data:\n{comparison_data.to_string(index=False)}"
+            )
+
         if args.export_to_csv and args.complexity is not None:
             assert export_efficiency is not None
             assert export_portability is not None
@@ -338,6 +440,20 @@ def main(argv: list[str] | None = None) -> int:
                 log_complexity=args.log_complexity,
                 show_legends=not args.legend,
             )
+        elif args.chart == "complexity-comparison":
+            assert comparison_data is not None
+            assert comparison_labels is not None
+            figure = plot_complexity_comparison(
+                comparison_data,
+                comparison_labels[0],
+                comparison_labels[1],
+                problem_title,
+                remove_description=args.remove_description,
+                log_axes=args.log_complexity,
+                show_legends=not args.legend,
+                show_coefficients=args.legend_comparison_coefficients,
+                baselines=comparison_baselines,
+            )
         elif args.chart == "heatmap":
             figure = plot_efficiency_heatmap(
                 efficiency,
@@ -401,7 +517,12 @@ def main(argv: list[str] | None = None) -> int:
                 ]
             ]
             export_metrics_to_csv(export_efficiency, export_portability, output)
-        if args.legend and args.chart in {"cascade", "navchart", "combined"}:
+        if args.legend and args.chart in {
+            "cascade",
+            "navchart",
+            "combined",
+            "complexity-comparison",
+        }:
             legend_source = navchart_data if args.chart == "navchart" else portability
             assert legend_source is not None
             legend_applications = list(
