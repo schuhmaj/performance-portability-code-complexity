@@ -5,7 +5,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from ppbcc.performance_portability.selection import ALL_SIZE, parse_problem_size
+from ppbcc.performance_portability.selection import (
+    ALL_SIZE,
+    AVERAGE_OVER_EFFICIENCY,
+    AVERAGE_OVER_PP,
+    parse_problem_size,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -136,6 +141,19 @@ def build_parser() -> argparse.ArgumentParser:
             "the arithmetic mean; 'best' takes the maximum; and 'worst' "
             "takes the minimum of each metric over problem sizes. Scaling "
             "still uses all sizes. Boxplots accept only 'all' or a numeric size."
+        ),
+    )
+    metrics.add_argument(
+        "--average-over",
+        choices=(AVERAGE_OVER_PP, AVERAGE_OVER_EFFICIENCY),
+        default=AVERAGE_OVER_PP,
+        help=(
+            "How --size avg reduces PP over problem sizes: 'pp' computes PP at "
+            "every size and takes the arithmetic mean of those scores; "
+            "'efficiency' averages each application efficiency over the sizes "
+            "first and computes PP once from the averages. Application "
+            "efficiency and the per-size heatmap are the same either way. "
+            "Only valid with --size avg."
         ),
     )
     metrics.add_argument(

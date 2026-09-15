@@ -183,6 +183,7 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
 | `--complexity-metric` | SLOC, Halstead vocabulary/length/volume/difficulty/effort (default: `halstead-effort`) |
 | `--normalize` / `--additive` | Divide by, or subtract, the plain-C++ complexity score (mutually exclusive) |
 | `-s, --size` | `all` (default), an exact size, or `avg`/`best`/`worst` |
+| `--average-over` | With `-s avg`: average Φ over sizes (`pp`, default) or compute Φ from size-averaged efficiencies (`efficiency`) |
 | `--non-zero-pp` | Calculate Φ over supported platforms only |
 | `-x, --exclude` / `-i, --include` | Regex filters on the `Description` column |
 | `--remove-description` | Drop bracketed labels such as `[Naive]`; efficiency charts combine variants by paradigm |

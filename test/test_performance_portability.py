@@ -20,10 +20,17 @@ from ppbcc.performance_portability.complexity import (
     load_complexity_baseline,
     load_complexity_data,
 )
-from ppbcc.performance_portability.metrics import calculate_metrics
+from ppbcc.performance_portability.metrics import (
+    calculate_average_size_metrics,
+    calculate_export_metrics,
+    calculate_metrics,
+)
 from ppbcc.performance_portability.options import build_parser
 from ppbcc.performance_portability.selection import (
     ALL_SIZE,
+    AVERAGE_OVER_EFFICIENCY,
+    AVERAGE_OVER_PP,
+    AVERAGE_SIZE,
     parse_problem_size,
     select_problem_rows,
 )
@@ -123,6 +130,73 @@ def test_boxplot_rejects_summary_size_literals(literal, tmp_path):
         )
         == 1
     )
+
+
+def _size_swap_frame() -> pd.DataFrame:
+    """Kokkos is best on NVIDIA at the small size and on AMD at the large one.
+
+    Kokkos' efficiency is (1, 0.25) at size 10 and (0.25, 1) at size 100, so
+    its PP is 0.4 at either size while its size-averaged efficiency is 0.625
+    on both platforms.
+    """
+    rows = [
+        (10, "NVIDIA", 10.0, 10.0),
+        (10, "AMD", 10.0, 40.0),
+        (100, "NVIDIA", 10.0, 40.0),
+        (100, "AMD", 10.0, 10.0),
+    ]
+    return pd.DataFrame(
+        [
+            ["NBody", paradigm, "", 64, hardware, size, runtime, "ms"]
+            for size, hardware, cuda, kokkos in rows
+            for paradigm, runtime in (("Cuda", cuda), ("Kokkos", kokkos))
+        ],
+        columns=_benchmark_frame().columns,
+    )
+
+
+def _kokkos_pp(portability: pd.DataFrame) -> float:
+    return portability.loc[
+        portability[APPLICATION].eq("Kokkos"), PERFORMANCE_PORTABILITY
+    ].item()
+
+
+def test_average_over_pp_averages_the_per_size_scores():
+    _, portability = calculate_average_size_metrics(
+        _size_swap_frame(), False, average_over=AVERAGE_OVER_PP
+    )
+    assert _kokkos_pp(portability) == pytest.approx(0.4)
+
+
+def test_average_over_efficiency_computes_pp_from_the_averages():
+    efficiency, portability = calculate_average_size_metrics(
+        _size_swap_frame(), False, average_over=AVERAGE_OVER_EFFICIENCY
+    )
+    kokkos = efficiency.loc[efficiency[APPLICATION].eq("Kokkos")]
+    assert kokkos[APPLICATION_EFFICIENCY].tolist() == pytest.approx([0.625, 0.625])
+    assert _kokkos_pp(portability) == pytest.approx(0.625)
+    # Pooling every size into one workload set is the same black-box reduction.
+    _, pooled = calculate_metrics(_size_swap_frame(), False)
+    assert _kokkos_pp(pooled) == pytest.approx(0.625)
+
+
+@pytest.mark.parametrize(
+    ("average_over", "expected"),
+    [(AVERAGE_OVER_PP, 0.4), (AVERAGE_OVER_EFFICIENCY, 0.625)],
+)
+def test_export_average_row_follows_average_over(average_over, expected):
+    _, portability = calculate_export_metrics(
+        _size_swap_frame(), False, average_over=average_over
+    )
+    average = portability.loc[portability[PROBLEM_SIZE].eq(AVERAGE_SIZE)]
+    assert _kokkos_pp(average) == pytest.approx(expected)
+
+
+def test_average_over_efficiency_requires_size_average(tmp_path):
+    from ppbcc.performance_portability.cli import main
+
+    arguments = ["NBody", str(tmp_path / "unused.csv"), "--average-over"]
+    assert main([*arguments, AVERAGE_OVER_EFFICIENCY]) == 1
 
 
 def _complexity_csv(tmp_path):

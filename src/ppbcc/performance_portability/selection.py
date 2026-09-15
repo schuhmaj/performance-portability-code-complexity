@@ -29,6 +29,9 @@ AVERAGE_SIZE = "average"
 BEST_SIZE = "best"
 WORST_SIZE = "worst"
 
+AVERAGE_OVER_PP = "pp"
+AVERAGE_OVER_EFFICIENCY = "efficiency"
+
 
 def parse_problem_size(value: str) -> float | str:
     """Parse a numeric problem size or a size-summary sentinel.

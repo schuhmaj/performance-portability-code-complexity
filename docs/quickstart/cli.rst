@@ -172,6 +172,8 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
      - Divide by, or subtract, the plain-C++ complexity score (mutually exclusive)
    * - ``-s, --size``
      - ``all`` (default), an exact size, or ``avg``/``best``/``worst``
+   * - ``--average-over``
+     - With ``-s avg``: average :math:`\Phi` over sizes (``pp``, default) or compute :math:`\Phi` from size-averaged efficiencies (``efficiency``)
    * - ``--non-zero-pp``
      - Compute :math:`\Phi` over supported platforms only
    * - ``-x, --exclude`` / ``-i, --include``

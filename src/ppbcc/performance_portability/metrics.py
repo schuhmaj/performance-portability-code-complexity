@@ -19,12 +19,44 @@ from ppbcc.constants import (
     PROBLEM_SIZE,
 )
 from ppbcc.performance_portability.selection import (
+    AVERAGE_OVER_EFFICIENCY,
+    AVERAGE_OVER_PP,
     AVERAGE_SIZE,
     BEST_SIZE,
     WORST_SIZE,
     _application_label,
     _convert_runtime_to_ns,
 )
+
+
+def _harmonic_mean_or_zero(
+    values: pd.Series, platform_count: int, non_zero_pp: bool
+) -> float:
+    """Calculate PP, optionally omitting unsupported platforms.
+
+    Args:
+        values: One application efficiency per platform.
+        platform_count: Size of the platform set PP is defined over.
+        non_zero_pp: Whether platforms with zero efficiency are omitted.
+
+    Returns:
+        The harmonic mean, or zero if a required platform is unsupported.
+    """
+    numeric = values.to_numpy(dtype=float)
+    if non_zero_pp:
+        numeric = numeric[numeric > 0.0]
+        if len(numeric) == 0:
+            return 0.0
+        return float(len(numeric) / np.reciprocal(numeric).sum())
+    if len(numeric) != platform_count or np.any(numeric <= 0.0):
+        return 0.0
+    return float(len(numeric) / np.reciprocal(numeric).sum())
+
+
+def _validate_average_over(average_over: str) -> None:
+    """Reject an unknown ``--average-over`` mode."""
+    if average_over not in {AVERAGE_OVER_PP, AVERAGE_OVER_EFFICIENCY}:
+        raise ValueError(f"Unsupported average-over mode: {average_over!r}")
 
 
 def calculate_metrics(
@@ -131,21 +163,9 @@ def calculate_metrics(
         .sort_values([APPLICATION, HARDWARE])
     )
 
-    def harmonic_mean_or_zero(values: pd.Series) -> float:
-        """Calculate PP, optionally omitting unsupported platforms."""
-        numeric = values.to_numpy(dtype=float)
-        if non_zero_pp:
-            numeric = numeric[numeric > 0.0]
-            if len(numeric) == 0:
-                return 0.0
-            return float(len(numeric) / np.reciprocal(numeric).sum())
-        if len(numeric) != len(hardware) or np.any(numeric <= 0.0):
-            return 0.0
-        return float(len(numeric) / np.reciprocal(numeric).sum())
-
     portability = (
         efficiency.groupby(APPLICATION, as_index=False)[APPLICATION_EFFICIENCY]
-        .agg(harmonic_mean_or_zero)
+        .agg(_harmonic_mean_or_zero, len(hardware), non_zero_pp)
         .rename(columns={APPLICATION_EFFICIENCY: PERFORMANCE_PORTABILITY})
         .sort_values(PERFORMANCE_PORTABILITY, ascending=False)
     )
@@ -221,14 +241,36 @@ def calculate_average_size_metrics(
     df: pd.DataFrame,
     description_is_workload: bool,
     non_zero_pp: bool = False,
+    average_over: str = AVERAGE_OVER_PP,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Average application efficiency and PP independently over sizes.
+    """Average application efficiency and PP over sizes.
 
-    Both metrics are first calculated independently at every size, then
-    arithmetically averaged. This gives every problem size equal weight and
-    avoids taking the harmonic mean of already size-averaged efficiencies when
-    ``--size average`` was explicitly requested.
+    Application efficiency is calculated independently at every size and then
+    arithmetically averaged, so every problem size has equal weight. PP is
+    reduced in one of two ways:
+
+    * ``pp``: PP is calculated at every size and the scores are averaged
+      arithmetically.
+    * ``efficiency``: the size sweep is treated as one benchmark. PP is the
+      harmonic mean over platforms of the size-averaged efficiencies, i.e.
+      exactly the PP of the plotted application-efficiency panel.
+
+    The two differ whenever an application's platform ranking changes with the
+    size: the arithmetic mean of harmonic means is not a harmonic mean.
+
+    Args:
+        df: Selected rows for one benchmark problem.
+        description_is_workload: Whether Description belongs to the workload key.
+        non_zero_pp: Whether unsupported platforms are excluded from PP.
+        average_over: ``pp`` or ``efficiency``, see above.
+
+    Returns:
+        Size-averaged application efficiency and performance portability.
+
+    Raises:
+        ValueError: If ``average_over`` is unsupported.
     """
+    _validate_average_over(average_over)
     per_size_efficiency, per_size_portability = calculate_metrics_by_size(
         df,
         description_is_workload,
@@ -241,14 +283,19 @@ def calculate_average_size_metrics(
         .mean()
         .sort_values([APPLICATION, HARDWARE])
     )
-    portability = (
-        per_size_portability.groupby(APPLICATION, as_index=False)[
+    if average_over == AVERAGE_OVER_EFFICIENCY:
+        portability = (
+            efficiency.groupby(APPLICATION, as_index=False)[APPLICATION_EFFICIENCY]
+            .agg(_harmonic_mean_or_zero, df[HARDWARE].nunique(), non_zero_pp)
+            .rename(columns={APPLICATION_EFFICIENCY: PERFORMANCE_PORTABILITY})
+        )
+    else:
+        portability = per_size_portability.groupby(APPLICATION, as_index=False)[
             PERFORMANCE_PORTABILITY
-        ]
-        .mean()
-        .sort_values(PERFORMANCE_PORTABILITY, ascending=False)
+        ].mean()
+    return efficiency, portability.sort_values(
+        PERFORMANCE_PORTABILITY, ascending=False
     )
-    return efficiency, portability
 
 
 def calculate_extreme_size_metrics(
@@ -306,14 +353,19 @@ def calculate_export_metrics(
     df: pd.DataFrame,
     description_is_workload: bool,
     non_zero_pp: bool = False,
+    average_over: str = AVERAGE_OVER_PP,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Calculate export metrics without combining sizes or precisions.
 
     Returns one efficiency row per application, size, precision, and hardware,
     and one portability row per application, size, and precision. Additional
     rows with Problem Size ``average`` contain per-precision arithmetic means
-    over the independently calculated size metrics.
+    over the independently calculated size efficiencies. Their PP is the mean
+    of the per-size PP scores for ``average_over="pp"``, or the harmonic mean
+    of the averaged efficiencies for ``average_over="efficiency"`` (see
+    :func:`calculate_average_size_metrics`).
     """
+    _validate_average_over(average_over)
     dimensions = [PROBLEM_SIZE, PRECISION]
     platforms = sorted(df[HARDWARE].unique())
     applications = sorted(
@@ -353,15 +405,27 @@ def calculate_export_metrics(
         .sort_values([APPLICATION, PRECISION, HARDWARE])
     )
     average_efficiency.insert(1, PROBLEM_SIZE, AVERAGE_SIZE)
-    average_portability = (
-        portability.groupby(
-            [APPLICATION, PRECISION],
-            as_index=False,
-            dropna=False,
-        )[PERFORMANCE_PORTABILITY]
-        .mean()
-        .sort_values([APPLICATION, PRECISION])
-    )
+    if average_over == AVERAGE_OVER_EFFICIENCY:
+        average_portability = (
+            average_efficiency.groupby(
+                [APPLICATION, PRECISION],
+                as_index=False,
+                dropna=False,
+            )[APPLICATION_EFFICIENCY]
+            .agg(_harmonic_mean_or_zero, len(platforms), non_zero_pp)
+            .rename(columns={APPLICATION_EFFICIENCY: PERFORMANCE_PORTABILITY})
+            .sort_values([APPLICATION, PRECISION])
+        )
+    else:
+        average_portability = (
+            portability.groupby(
+                [APPLICATION, PRECISION],
+                as_index=False,
+                dropna=False,
+            )[PERFORMANCE_PORTABILITY]
+            .mean()
+            .sort_values([APPLICATION, PRECISION])
+        )
     average_portability.insert(1, PROBLEM_SIZE, AVERAGE_SIZE)
     return (
         pd.concat([efficiency, average_efficiency], ignore_index=True),

@@ -37,6 +37,7 @@ from ppbcc.performance_portability.metrics import (
 from ppbcc.performance_portability.options import build_parser
 from ppbcc.performance_portability.selection import (
     ALL_SIZE,
+    AVERAGE_OVER_PP,
     AVERAGE_SIZE,
     BEST_SIZE,
     WORST_SIZE,
@@ -105,6 +106,11 @@ def main(argv: list[str] | None = None) -> int:
                 "--chart boxplot requires --size all or an exact numeric size; "
                 f"{args.size!r} collapses the efficiency distribution."
             )
+        if args.average_over != AVERAGE_OVER_PP and args.size != AVERAGE_SIZE:
+            raise ValueError(
+                f"--average-over {args.average_over} requires --size avg; the "
+                "other size modes do not average PP over sizes."
+            )
         if (args.normalize or args.additive) and (
             args.complexity is None
             or args.chart not in {"navchart", "combined", "complexity-comparison"}
@@ -170,6 +176,7 @@ def main(argv: list[str] | None = None) -> int:
                         selected,
                         description_is_workload,
                         non_zero_pp=args.non_zero_pp,
+                        average_over=args.average_over,
                     )
                 )
             elif args.size in {BEST_SIZE, WORST_SIZE}:
@@ -230,6 +237,7 @@ def main(argv: list[str] | None = None) -> int:
                     export_rows,
                     export_description_is_workload,
                     non_zero_pp=args.non_zero_pp,
+                    average_over=args.average_over,
                 )
                 export_efficiency.insert(0, PROBLEM, export_problem)
                 export_portability.insert(0, PROBLEM, export_problem)
@@ -427,6 +435,7 @@ def main(argv: list[str] | None = None) -> int:
                 log_complexity=args.log_complexity,
                 log_size=args.log_size,
                 selected_size=None if args.size == ALL_SIZE else args.size,
+                average_over=args.average_over,
                 show_legends=not args.legend,
             )
         elif args.chart == "navchart":
@@ -476,6 +485,7 @@ def main(argv: list[str] | None = None) -> int:
                 problem_title,
                 remove_description=args.remove_description,
                 selected_size=None if args.size == ALL_SIZE else args.size,
+                average_over=args.average_over,
                 show_legends=not args.legend,
             )
 

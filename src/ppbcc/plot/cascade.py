@@ -20,6 +20,8 @@ from ppbcc.constants import (
     PROBLEM_SIZE,
 )
 from ppbcc.performance_portability.selection import (
+    AVERAGE_OVER_EFFICIENCY,
+    AVERAGE_OVER_PP,
     AVERAGE_SIZE,
     BEST_SIZE,
     WORST_SIZE,
@@ -230,6 +232,7 @@ def plot_cascade(
     log_complexity: bool = False,
     log_size: bool = False,
     selected_size: float | str | None = None,
+    average_over: str = AVERAGE_OVER_PP,
     show_legends: bool = True,
 ) -> plt.Figure:
     """Create a Cascade Plot following the P3 Analysis Library layout.
@@ -248,6 +251,9 @@ def plot_cascade(
             scale logarithmically.
         selected_size: Optional benchmark size or size-summary mode for the two
             upper panels.
+        average_over: For an averaged size, whether PP was averaged over the
+            sizes (``pp``) or computed from the averaged efficiencies
+            (``efficiency``); only changes the note above the panels.
         show_legends: Whether legends are embedded in the plot.
 
     Returns:
@@ -498,7 +504,12 @@ def plot_cascade(
     if selected_size is not None:
         upper_left = efficiency_axis.get_position()
         upper_right = portability_axis.get_position()
-        if selected_size == AVERAGE_SIZE:
+        if selected_size == AVERAGE_SIZE and average_over == AVERAGE_OVER_EFFICIENCY:
+            size_note = (
+                f"$e_A$ averaged over benchmark sizes, {PP_SYMBOL} computed "
+                "from the averages"
+            )
+        elif selected_size == AVERAGE_SIZE:
             size_note = f"{PP_SYMBOL} and $e_A$ averaged over benchmark sizes"
         elif selected_size in {BEST_SIZE, WORST_SIZE}:
             size_note = (

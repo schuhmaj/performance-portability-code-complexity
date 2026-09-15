@@ -83,6 +83,17 @@ Problem sizes
 | ``best`` / ``worst``    | Take the per-application maximum / minimum over sizes               |
 +-------------------------+---------------------------------------------------------------------+
 
+``--average-over`` decides what ``avg`` averages for :math:`\Phi`. The default
+``pp`` computes :math:`\Phi` at every size and takes the arithmetic mean of the
+scores. ``efficiency`` treats the size sweep as one benchmark: it averages every
+application efficiency over the sizes and computes :math:`\Phi` once, as the
+harmonic mean of those averages — so the :math:`\Phi` panel is exactly the
+harmonic mean of the efficiency panel next to it. The two differ whenever an
+implementation's best platform changes with the size, because an arithmetic
+mean of harmonic means is not a harmonic mean. Application efficiency and the
+per-size scaling heatmap are identical in both modes, and the option is
+rejected for every ``-s`` other than ``avg``.
+
 Boxplots accept only ``all`` or an exact numeric size, because the summary
 modes remove the very distribution the boxplot displays. In the combined
 chart, the scaling panel always uses all sizes regardless of ``-s``.
