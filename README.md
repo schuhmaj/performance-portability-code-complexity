@@ -172,7 +172,7 @@ without it the launches are unnamed and all of them are kept, with a warning.
 
 Application efficiency, performance portability, and plots from benchmark CSVs.
 `p2analysis PLOT CSV...` renders the charts that need benchmark results only
-(`cascade`, `heatmap`, `boxplot`); `p3analysis PLOT COMPLEXITY_CSV CSV...`
+(`cascade`, `heatmap`, `boxplot`, `time-barplot`); `p3analysis PLOT COMPLEXITY_CSV CSV...`
 renders the charts that also need code complexity (`navchart`, `combined`,
 `complexity-comparison`).
 
@@ -189,6 +189,8 @@ renders the charts that also need code complexity (`navchart`, `combined`,
 | `--average-over` | With `-s avg`: average Φ over sizes (`pp`, default) or compute Φ from size-averaged efficiencies (`efficiency`) |
 | `--non-zero-pp` | Calculate Φ over supported platforms only |
 | `-x, --exclude` / `-i, --include` | Regex filters on the `Description` column |
+| `-t, --time` | `time-barplot` only: `wall-clock` (default), `kernel`, `force-update`, `neighbor-search` |
+| `--normalize-time-to-peak` | `time-barplot` only: multiply runtimes by the platform's published peak FLOP/s |
 | `--remove-description` | Drop bracketed labels such as `[Naive]`; efficiency charts combine variants by paradigm |
 | `-l, --legend` | Save the legend as a separate PDF (`--legend--vertical` for one column) |
 | `-e, --export-to-csv` | Also export efficiency and portability data as CSV |
@@ -201,7 +203,8 @@ ppbcc p3analysis combined ./code-complexity/code-complexity.csv ./Results_* \
 ```
 
 Not every option applies to every chart, and invalid combinations are rejected
-rather than silently ignored: `-H/--hardware` is `boxplot`-only, `boxplot`
+rather than silently ignored: `-H/--hardware` is valid for `boxplot` and
+`time-barplot` only, `time-barplot` needs one exact size (the largest by default), `boxplot`
 needs `-s all` or an exact numeric size, and `complexity-comparison` rejects
 `--complexity-metric-absolute`.
 See [`examples/`](examples/) for one rendered example of every chart together

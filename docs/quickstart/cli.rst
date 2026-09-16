@@ -159,7 +159,7 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
    * - Option
      - Meaning
    * - ``PLOT``
-     - ``p2analysis``: ``cascade``, ``heatmap``, ``boxplot``;
+     - ``p2analysis``: ``cascade``, ``heatmap``, ``boxplot``, ``time-barplot``;
        ``p3analysis``: ``navchart``, ``combined``, ``complexity-comparison``
    * - ``COMPLEXITY_CSV``
      - ``p3analysis`` only: code-complexity CSV with one row per implementation
@@ -186,7 +186,11 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
    * - ``-x, --exclude`` / ``-i, --include``
      - Regex filters on the ``Description`` column
    * - ``-H, --hardware``
-     - ``p2analysis`` only: restrict a ``boxplot`` to one platform
+     - ``p2analysis`` only: restrict a ``boxplot`` or ``time-barplot`` to one platform
+   * - ``-t, --time``
+     - ``time-barplot`` only: ``wall-clock`` (default), ``kernel``, ``force-update``, ``neighbor-search``
+   * - ``--normalize-time-to-peak``
+     - ``time-barplot`` only: multiply runtimes by the platform's published peak FLOP/s
    * - ``--remove-description``
      - Drop bracketed labels such as ``[Naive]``; efficiency charts combine variants by paradigm
    * - ``-l, --legend``
@@ -216,9 +220,12 @@ combinations rather than silently ignoring them:
    * - ``--compare-metric``
      - ``complexity-comparison`` only
    * - ``-H, --hardware``
-     - ``boxplot`` only
+     - ``boxplot``, ``time-barplot``
+   * - ``-t, --time`` / ``--normalize-time-to-peak``
+     - ``time-barplot`` only
    * - ``-s avg``/``best``/``worst``
-     - every chart except ``boxplot`` (needs ``all`` or a numeric size)
+     - every chart except ``boxplot`` (needs ``all`` or a numeric size) and
+       ``time-barplot`` (needs a numeric size; ``all`` means the largest)
 
 Logging
 -------

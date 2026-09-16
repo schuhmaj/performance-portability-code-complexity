@@ -75,6 +75,13 @@ RUNTIME_COLUMNS = [
 ]
 
 TIME_UNIT_TO_NS = {"ns": 1.0, "us": 1e3, "ms": 1e6, "s": 1e9}
+#: Runtime columns selectable for the time bar plot, keyed by their CLI name.
+TIME_COLUMNS = {
+    "wall-clock": WALL_CLOCK_TIME,
+    "kernel": KERNEL_TIME,
+    "force-update": FORCE_UPDATE_TIME,
+    "neighbor-search": NEIGHBOR_SEARCH_TIME,
+}
 
 COLUMN_LIST = [
     BENCHMARK_PROBLEM,

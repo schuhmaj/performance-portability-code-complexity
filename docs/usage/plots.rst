@@ -3,7 +3,7 @@
 Available Plots
 ===============
 
-``ppbcc p2analysis`` and ``ppbcc p3analysis`` render six chart types, selected
+``ppbcc p2analysis`` and ``ppbcc p3analysis`` render seven chart types, selected
 by their first argument. All of them are shown below, all but one for the same
 benchmark problem, so they can be compared directly.
 
@@ -49,6 +49,8 @@ Chart overview
 | ``heatmap``               | Efficiency per paradigm and platform            | ``p2analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
 | ``boxplot``               | Efficiency distribution per paradigm            | ``p2analysis``    |
++---------------------------+-------------------------------------------------+-------------------+
+| ``time-barplot``          | Runtime per paradigm, grouped by platform       | ``p2analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
 
 Cascade plot
@@ -219,6 +221,48 @@ Boxplots accept only ``-s all`` or an exact numeric size — the ``avg``,
 ``best``, and ``worst`` modes collapse the distribution the chart exists to
 show. Use ``-H/--hardware`` to restrict a boxplot to a single platform; that
 option is an error for every other chart type.
+
+Runtime bar plot
+----------------
+
+The runtime bar plot shows the measured time itself: one bar per paradigm in
+the paradigm's color, grouped by platform, on a logarithmic axis. Every group
+keeps a slot per paradigm in the same order, so a paradigm is found at the same
+position on every platform, and a slot stays empty where it has no result. With
+``-H/--hardware`` the chart shows a single platform and labels the bars with
+their paradigm instead.
+
+.. figure:: ../figures/matrixmultiplication_time_barplot.svg
+   :alt: Kernel time per paradigm, grouped by platform
+   :width: 100%
+   :class: plot-figure
+
+   ``time-barplot -t kernel`` — kernel time at the largest matrix size.
+
+.. code-block:: bash
+
+    ppbcc p2analysis time-barplot ./Results_* -n MatrixMultiplication -t kernel \
+      -x "Cublas" --remove-description
+
+``-t/--time`` selects the runtime column — ``wall-clock`` (default),
+``kernel``, ``force-update`` or ``neighbor-search`` — and a column the selected
+results do not contain is an error rather than an empty chart. The chart uses
+the largest benchmark size unless ``-s`` names another one; the ``avg``,
+``best`` and ``worst`` summaries are rejected, because they would put runtimes
+of different sizes into one bar. Runtimes that are missing or not positive are
+dropped with a warning, since a logarithmic axis cannot show them. With
+``--remove-description`` the fastest variant stands for its paradigm.
+
+``--normalize-time-to-peak`` multiplies every runtime by the published peak
+performance of its platform and precision, so the axis shows the FLOPs the
+platform could have executed in that time. That puts GPUs of very different
+capability on one scale: a kernel that is merely fast because it ran on a big
+GPU no longer looks better than it is. The peaks are datasheet values taken
+from :mod:`ppbcc.hardware`, which cites the source of each one; they are not the
+measured ceilings of :doc:`profiling`.
+
+``-e/--export-to-csv`` writes the plotted runtimes next to the chart as
+``<plot-prefix>.csv``.
 
 Legends and output
 ------------------

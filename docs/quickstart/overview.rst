@@ -29,7 +29,7 @@ The three workflows
 +-----------------------------+---------------------------------------------------------------+-------------------+
 | ``ppbcc benchmark``         | Run Google Benchmark targets, consolidate JSON into one CSV   | yes               |
 +-----------------------------+---------------------------------------------------------------+-------------------+
-| ``ppbcc p2analysis``        | Application efficiency, performance portability, three charts | yes (CSV input)   |
+| ``ppbcc p2analysis``        | Application efficiency, performance portability, runtimes     | yes (CSV input)   |
 +-----------------------------+---------------------------------------------------------------+-------------------+
 | ``ppbcc p3analysis``        | Performance portability against code complexity, three charts | yes (CSV input)   |
 +-----------------------------+---------------------------------------------------------------+-------------------+

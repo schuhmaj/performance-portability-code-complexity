@@ -18,7 +18,9 @@ from ppbcc.constants import (
     PRECISION,
     PROBLEM,
     PROBLEM_SIZE,
+    TIME_COLUMNS,
 )
+from ppbcc.hardware import peak_performance
 from ppbcc.performance_portability.complexity import (
     add_complexity_to_export,
     append_cpp_complexity_row,
@@ -34,6 +36,7 @@ from ppbcc.performance_portability.metrics import (
     calculate_extreme_size_metrics,
     calculate_metrics,
     calculate_metrics_by_size,
+    calculate_runtimes,
     calculate_scaling_metrics,
 )
 from ppbcc.performance_portability.options import (
@@ -59,6 +62,7 @@ from ppbcc.plot.heatmap import (
     plot_efficiency_heatmap,
 )
 from ppbcc.plot.navchart import plot_navchart
+from ppbcc.plot.time_barplot import PEAK_FLOP, RUNTIME_NS, plot_time_barplot
 from ppbcc.plot.styles import (
     create_separate_legend,
     resolve_output_path,
@@ -77,10 +81,138 @@ def p2analysis_main(argv: list[str] | None = None) -> int:
     """
     args = build_p2_parser().parse_args(argv)
     configure_logging(args.verbose)
-    if args.hardware is not None and args.chart != "boxplot":
-        logger.error("--hardware is only valid for boxplot charts.")
+    if args.hardware is not None and args.chart not in {"boxplot", "time-barplot"}:
+        logger.error("--hardware is only valid for boxplot and time-barplot charts.")
+        return 1
+    if args.chart != "time-barplot" and (
+        args.time is not None or args.normalize_time_to_peak
+    ):
+        logger.error(
+            "--time and --normalize-time-to-peak are only valid for time-barplot."
+        )
         return 1
     return _analyze(args)
+
+
+def _filter_hardware(
+    rows: pd.DataFrame, hardware: str | None, problem: str
+) -> pd.DataFrame:
+    """Keep only the rows of one hardware label, if one is requested.
+
+    Args:
+        rows: Selected benchmark rows.
+        hardware: Requested ``Hardware`` label, or ``None`` to keep all rows.
+        problem: Resolved problem name, used in the error message.
+
+    Returns:
+        The matching rows.
+
+    Raises:
+        ValueError: If no row matches the requested hardware.
+    """
+    if hardware is None:
+        return rows
+    hardware_labels = rows[HARDWARE].astype(str)
+    hardware_mask = hardware_labels.eq(hardware)
+    if not hardware_mask.any():
+        available_hardware = sorted(hardware_labels.unique(), key=str.casefold)
+        raise ValueError(
+            f"Hardware {hardware!r} has no selected rows for {problem}. "
+            f"Available hardware: {available_hardware}"
+        )
+    return rows.loc[hardware_mask].copy()
+
+
+def _time_barplot(args: argparse.Namespace, benchmark_data: pd.DataFrame) -> None:
+    """Render the runtime bar chart, its separate legend and its CSV export.
+
+    Args:
+        args: Parsed ``p2analysis`` arguments.
+        benchmark_data: Combined benchmark results.
+
+    Raises:
+        ValueError: If the selection leaves no plottable runtime.
+    """
+    if isinstance(args.size, str) and args.size != ALL_SIZE:
+        raise ValueError(
+            "time-barplot requires an exact numeric --size, or 'all' for the "
+            f"largest one; {args.size!r} would mix runtimes of different sizes."
+        )
+    time_key = args.time or "wall-clock"
+    time_column = TIME_COLUMNS[time_key]
+    problem_query = _resolve_problem_query(benchmark_data, args.name)
+    rows, problem, description_is_workload = select_problem_rows(
+        benchmark_data,
+        problem_query,
+        args.description_include,
+        args.description_exclude,
+        args.size if isinstance(args.size, float) else None,
+        args.precision,
+    )
+    rows = _filter_hardware(rows, args.hardware, problem)
+    size = float(pd.to_numeric(rows[PROBLEM_SIZE], errors="coerce").max())
+    rows = _filter_problem_size(rows, size, problem)
+
+    if time_column not in rows.columns or rows[time_column].isna().all():
+        available = [
+            key
+            for key, column in TIME_COLUMNS.items()
+            if column in rows.columns and rows[column].notna().any()
+        ]
+        raise ValueError(
+            f"{problem} has no {time_column!r} results. Available --time "
+            f"choices: {available}"
+        )
+    precisions = sorted(pd.to_numeric(rows[PRECISION], errors="coerce").unique())
+    if len(precisions) != 1:
+        raise ValueError(
+            f"{problem} has results in several precisions {precisions}; "
+            "select one with -p/--precision."
+        )
+    precision = int(precisions[0])
+
+    runtimes = calculate_runtimes(
+        rows,
+        description_is_workload,
+        time_column,
+        remove_description=args.remove_description,
+    )
+    if args.normalize_time_to_peak:
+        runtimes[PEAK_FLOP] = [
+            runtime_ns * 1e-9 * peak_performance(str(hardware), int(row_precision))
+            for runtime_ns, hardware, row_precision in zip(
+                runtimes[RUNTIME_NS], runtimes[HARDWARE], runtimes[PRECISION]
+            )
+        ]
+
+    output = resolve_output_path(args.output, [problem], f"time-barplot-{time_key}")
+    figure = plot_time_barplot(
+        runtimes,
+        problem,
+        time_column,
+        size,
+        precision,
+        normalized=args.normalize_time_to_peak,
+        remove_description=args.remove_description,
+        show_legends=not args.legend,
+    )
+    save_figure(figure, output)
+    if args.export_to_csv:
+        export = runtimes.copy()
+        export.insert(0, PROBLEM, problem)
+        export.insert(3, PROBLEM_SIZE, size)
+        csv_output = output.with_suffix(".csv")
+        export.to_csv(csv_output, index=False)
+        logger.success(f"Wrote runtimes: {csv_output.resolve()}")
+    if args.legend:
+        legend_figure = create_separate_legend(
+            list(runtimes[APPLICATION].astype(str).unique()),
+            [problem],
+            [],
+            remove_description=args.remove_description,
+            vertical=args.legend_vertical,
+        )
+        save_figure(legend_figure, output.with_name(f"{output.stem}_legend.pdf"))
 
 
 def p3analysis_main(argv: list[str] | None = None) -> int:
@@ -162,6 +294,9 @@ def _analyze(args: argparse.Namespace) -> int:
             )
 
         benchmark_data = load_benchmark_csvs(args.csv_files)
+        if args.chart == "time-barplot":
+            _time_barplot(args, benchmark_data)
+            return 0
         efficiency_frames: list[pd.DataFrame] = []
         portability_frames: list[pd.DataFrame] = []
         export_efficiency_frames: list[pd.DataFrame] = []
@@ -221,20 +356,9 @@ def _analyze(args: argparse.Namespace) -> int:
             portability_frames.append(problem_portability)
 
             if args.chart == "boxplot":
-                boxplot_rows = selected
-                if args.hardware is not None:
-                    hardware_labels = selected[HARDWARE].astype(str)
-                    hardware_mask = hardware_labels.eq(args.hardware)
-                    if not hardware_mask.any():
-                        available_hardware = sorted(
-                            hardware_labels.unique(), key=str.casefold
-                        )
-                        raise ValueError(
-                            f"Hardware {args.hardware!r} has no selected rows for "
-                            f"{resolved_problem}. Available hardware: "
-                            f"{available_hardware}"
-                        )
-                    boxplot_rows = selected.loc[hardware_mask].copy()
+                boxplot_rows = _filter_hardware(
+                    selected, args.hardware, resolved_problem
+                )
                 boxplot_efficiency, _ = calculate_metrics_by_size(
                     boxplot_rows,
                     description_is_workload,

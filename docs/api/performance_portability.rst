@@ -39,3 +39,9 @@ Shared Constants
 
 .. automodule:: ppbcc.constants
    :members:
+
+Peak Performance of the Platforms
+---------------------------------
+
+.. automodule:: ppbcc.hardware
+   :members:

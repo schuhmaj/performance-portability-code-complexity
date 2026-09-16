@@ -420,7 +420,8 @@ def create_separate_legend(
     """Create a standalone paradigm/device legend.
 
     Paradigms are placed at the top and devices at the bottom. A problem-marker
-    section is included between them when more than one problem is plotted. By
+    section is included between them when more than one problem is plotted, and
+    the device section is left out when no platforms are given. By
     default each section is a separate four-column legend; vertical mode
     combines the sections into one single-column legend with subheadings.
 
@@ -462,7 +463,8 @@ def create_separate_legend(
                     _problem_legend_handles(problems, markers),
                 )
             )
-        sections.append(("Device", device_handles))
+        if device_handles:
+            sections.append(("Device", device_handles))
 
         grouped_handles = []
         heading_indexes = []
@@ -488,7 +490,7 @@ def create_separate_legend(
         return figure
 
     paradigm_rows = max(1, (len(paradigm_handles) + 3) // 4)
-    device_rows = max(1, (len(device_handles) + 3) // 4)
+    device_rows = (len(device_handles) + 3) // 4
     problem_rows = 1 if len(problems) > 1 else 0
     height = 1.0 + 0.55 * (paradigm_rows + device_rows + problem_rows)
     figure = plt.figure(figsize=(13.0, height))
@@ -509,14 +511,15 @@ def create_separate_legend(
             ncol=4,
             frameon=True,
         )
-    figure.legend(
-        handles=device_handles,
-        title="Device",
-        loc="lower center",
-        bbox_to_anchor=(0.5, 0.02),
-        ncol=4,
-        frameon=True,
-    )
+    if device_handles:
+        figure.legend(
+            handles=device_handles,
+            title="Device",
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.02),
+            ncol=4,
+            frameon=True,
+        )
     return figure
 
 

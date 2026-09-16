@@ -431,3 +431,64 @@ def calculate_export_metrics(
         pd.concat([efficiency, average_efficiency], ignore_index=True),
         pd.concat([portability, average_portability], ignore_index=True),
     )
+
+
+def calculate_runtimes(
+    df: pd.DataFrame,
+    description_is_workload: bool,
+    time_column: str,
+    remove_description: bool = False,
+) -> pd.DataFrame:
+    """Reduce benchmark rows to one runtime per application and platform.
+
+    Duplicate measurements are reduced to their median. Rows whose runtime is
+    missing or not positive are dropped with a warning, because a time bar on
+    a logarithmic axis cannot show them.
+
+    Args:
+        df: Selected benchmark rows of one problem size and precision.
+        description_is_workload: Whether Description belongs to the workload
+            key rather than the application label.
+        time_column: Runtime column to reduce, e.g. ``Kernel Time``.
+        remove_description: Whether implementation variants of one paradigm
+            are combined; the fastest variant then stands for the paradigm.
+
+    Returns:
+        One row per application, hardware and precision with the runtime in
+        nanoseconds in ``Runtime (ns)``.
+
+    Raises:
+        ValueError: If no positive runtime remains.
+    """
+    data = df.copy()
+    data[APPLICATION] = [
+        _application_label(
+            paradigm, "" if remove_description else description, description_is_workload
+        )
+        for paradigm, description in zip(data[PARADIGM], data[DESCRIPTION])
+    ]
+    data["Runtime (ns)"] = _convert_runtime_to_ns(data, time_column)
+    invalid = data["Runtime (ns)"].isna() | data["Runtime (ns)"].le(0)
+    if invalid.any():
+        dropped = sorted(
+            set(zip(data.loc[invalid, APPLICATION], data.loc[invalid, HARDWARE]))
+        )
+        logger.warning(
+            f"Dropping {int(invalid.sum())} rows without a positive "
+            f"{time_column!r}: {dropped}"
+        )
+        data = data.loc[~invalid].copy()
+    if data.empty:
+        raise ValueError(f"No positive {time_column!r} values remain.")
+
+    keys = [APPLICATION, HARDWARE, PRECISION]
+    medians = data.groupby(
+        [*keys, PARADIGM, DESCRIPTION], dropna=False, as_index=False
+    )["Runtime (ns)"].median()
+    return (
+        medians.groupby(keys, dropna=False, as_index=False)["Runtime (ns)"]
+        .min()
+        .sort_values(keys)
+        .reset_index(drop=True)
+    )
+

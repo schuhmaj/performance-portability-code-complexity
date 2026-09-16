@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from ppbcc.constants import TIME_COLUMNS
 from ppbcc.performance_portability.selection import (
     ALL_SIZE,
     AVERAGE_OVER_EFFICIENCY,
@@ -13,7 +14,7 @@ from ppbcc.performance_portability.selection import (
 )
 
 #: Charts that need benchmark results only.
-P2_CHARTS = ("cascade", "heatmap", "boxplot")
+P2_CHARTS = ("cascade", "heatmap", "boxplot", "time-barplot")
 #: Charts that combine benchmark results with code complexity.
 P3_CHARTS = ("navchart", "combined", "complexity-comparison")
 
@@ -150,7 +151,9 @@ def _add_shared_arguments(parser: argparse.ArgumentParser) -> None:
             "aggregate PP/complexity point; 'avg', 'average', or 'mean' takes "
             "the arithmetic mean; 'best' takes the maximum; and 'worst' "
             "takes the minimum of each metric over problem sizes. Scaling "
-            "still uses all sizes. Boxplots accept only 'all' or a numeric size."
+            "still uses all sizes. Boxplots accept only 'all' or a numeric size; "
+            "time-barplot accepts only a numeric size and uses the largest "
+            "size for 'all'."
         ),
     )
     metrics.add_argument(
@@ -199,7 +202,29 @@ def build_p2_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-H",
         "--hardware",
-        help="Only include results from this hardware in a boxplot.",
+        help=(
+            "Only include results from this hardware in a boxplot or "
+            "time-barplot."
+        ),
+    )
+    runtime = parser.add_argument_group("time-barplot options")
+    runtime.add_argument(
+        "-t",
+        "--time",
+        choices=tuple(TIME_COLUMNS),
+        help=(
+            "Runtime column to plot (default: wall-clock). It is an error if "
+            "the selected results do not contain it."
+        ),
+    )
+    runtime.add_argument(
+        "--normalize-time-to-peak",
+        action="store_true",
+        help=(
+            "Multiply every runtime by the published peak performance of its "
+            "platform and precision, i.e. plot the FLOPs the platform could "
+            "have executed in that time."
+        ),
     )
     return parser
 

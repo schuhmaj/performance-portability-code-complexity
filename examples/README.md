@@ -14,6 +14,7 @@ addition**.
 | [`vecadd_complexity_comparison.pdf`](vecadd_complexity_comparison.pdf) | `complexity-comparison` | Halstead difficulty against SLOC, both relative to plain C++ |
 | [`matrixmultiplication_heatmap.pdf`](matrixmultiplication_heatmap.pdf) | `heatmap` | Application efficiency per paradigm and platform |
 | [`matrixmultiplication_boxplot.pdf`](matrixmultiplication_boxplot.pdf) | `boxplot` | Application-efficiency distribution per paradigm |
+| [`matrixmultiplication_time_barplot.pdf`](matrixmultiplication_time_barplot.pdf) | `time-barplot` | Kernel time per paradigm, grouped by platform |
 
 They are also embedded, with a description of what each one is good for, in the
 [Available Plots](https://schuhmaj.github.io/performance-portability-code-complexity/usage/plots.html)
@@ -96,12 +97,25 @@ ppbcc p2analysis boxplot ./Results_* -n MatrixMultiplication \
   --non-zero-pp --remove-description -s all -x "Cublas"
 ```
 
+### Time bar plot
+
+```bash
+ppbcc p2analysis time-barplot ./Results_* -n MatrixMultiplication -t kernel \
+  -x "Cublas" --remove-description -o matrixmultiplication_time_barplot.pdf
+```
+
+The time bar plot uses the largest benchmark size by default. Add
+`--normalize-time-to-peak` to multiply every runtime by the platform's
+published peak FLOP/s.
+
 > [!NOTE]
 > `ppbcc p2analysis` and `ppbcc p3analysis` reject option/chart combinations
 > that would be silently misleading rather than ignoring them:
 > - `complexity-comparison` rejects `--complexity-metric-absolute`, because its
 >   identity line needs both metrics relative to plain C++.
-> - `-H/--hardware` is valid for `boxplot` only.
+> - `-H/--hardware` is valid for `boxplot` and `time-barplot` only.
+> - `-t/--time` and `--normalize-time-to-peak` are valid for `time-barplot`
+>   only, and `-t` rejects a runtime column the results do not contain.
 > - `boxplot` needs `-s all` or an exact numeric size; `avg`, `best`, and
 >   `worst` collapse the distribution the chart exists to show.
 

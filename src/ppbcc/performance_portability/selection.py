@@ -331,11 +331,14 @@ def _application_label(paradigm: str, description: str, is_workload: bool) -> st
     return paradigm
 
 
-def _convert_runtime_to_ns(df: pd.DataFrame) -> pd.Series:
-    """Convert wall-clock runtimes to nanoseconds.
+def _convert_runtime_to_ns(
+    df: pd.DataFrame, column: str = WALL_CLOCK_TIME
+) -> pd.Series:
+    """Convert a runtime column to nanoseconds.
 
     Args:
         df: Selected benchmark rows.
+        column: Runtime column to convert, the wall-clock time by default.
 
     Returns:
         Numeric runtimes expressed in nanoseconds.
@@ -350,6 +353,6 @@ def _convert_runtime_to_ns(df: pd.DataFrame) -> pd.Series:
             f"Unsupported values in {TIME_UNIT!r}: {unknown}. "
             f"Supported units: {sorted(TIME_UNIT_TO_NS)}"
         )
-    runtimes = pd.to_numeric(df[WALL_CLOCK_TIME], errors="coerce")
+    runtimes = pd.to_numeric(df[column], errors="coerce")
     factors = units.map(TIME_UNIT_TO_NS).astype(float)
     return runtimes * factors

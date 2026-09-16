@@ -33,6 +33,12 @@ Heatmap and Boxplot
 .. automodule:: ppbcc.plot.heatmap
    :members:
 
+Time Bar Plot
+-------------
+
+.. automodule:: ppbcc.plot.time_barplot
+   :members:
+
 Styles, Legends, and Output
 ---------------------------
 
