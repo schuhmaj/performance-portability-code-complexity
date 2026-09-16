@@ -233,8 +233,7 @@ def load_complexity_data(
     path: Path,
     problem_query: str,
     metric_request: str,
-    normalize: bool,
-    additive: bool,
+    normalize: bool = True,
 ) -> tuple[pd.DataFrame, str]:
     """Load, select, calculate, and optionally normalize complexity data.
 
@@ -242,8 +241,7 @@ def load_complexity_data(
         path: Complexity CSV path.
         problem_query: User-supplied benchmark problem query.
         metric_request: Requested metric or alias.
-        normalize: Whether to express values relative to CPP.
-        additive: Whether to subtract the CPP value from every value.
+        normalize: Whether to express values as a percentage of CPP.
 
     Returns:
         A pair of selected complexity rows and the plotted metric label.
@@ -258,20 +256,16 @@ def load_complexity_data(
 
     display_metric = "Source Lines of Code" if metric == "SLOC" else metric
     label = f"{display_metric} [absolute]"
-    if normalize or additive:
+    if normalize:
         baseline = _cpp_baseline(selected, metric, problem)
-        if normalize:
-            if baseline <= 0.0:
-                raise ValueError(
-                    "--normalize requires a positive CPP complexity score."
-                )
-            selected[metric] = selected[metric] / baseline * 100.0
-            label = f"{display_metric} [normalized]"
-            logger.debug(f"Normalized {metric} to CPP baseline {baseline:g}")
-        else:
-            selected[metric] = selected[metric] - baseline
-            label = f"{display_metric} [additive]"
-            logger.debug(f"Subtracted CPP {metric} baseline {baseline:g}")
+        if baseline <= 0.0:
+            raise ValueError(
+                "Normalizing requires a positive CPP complexity score; use "
+                "--complexity-metric-absolute to plot absolute values."
+            )
+        selected[metric] = selected[metric] / baseline * 100.0
+        label = f"{display_metric} [normalized]"
+        logger.debug(f"Normalized {metric} to CPP baseline {baseline:g}")
     selected = selected.rename(columns={metric: label})
     logger.info(f"Loaded {len(selected)} complexity rows for {problem}")
     return selected, label

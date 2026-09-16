@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from scipy.stats import kendalltau, spearmanr
 
 from ppbcc.constants import APPLICATION
 from ppbcc.plot.styles import (
@@ -173,7 +172,6 @@ def plot_complexity_comparison(
     remove_description: bool = False,
     log_axes: bool = True,
     show_legends: bool = True,
-    show_coefficients: bool = False,
     baselines: tuple[float, float] | None = None,
 ) -> plt.Figure:
     """Plot two complexity metrics against each other with an identity line.
@@ -195,9 +193,6 @@ def plot_complexity_comparison(
             With an external legend the paradigm colors are keyed there, so the
             labels are dropped: they do not survive the reduction to a narrow
             column anyway.
-        show_coefficients: Whether Spearman's rho and Kendall's tau are added to
-            the baseline key. Off by default; the numbers belong in the text,
-            where they can be given to three decimals and discussed.
         baselines: Absolute sequential C++ values of ``x_metric`` and
             ``y_metric``. Both axes are percentages of these, so the key states
             what 100 % stands for. Omitted when the values are unknown or when
@@ -285,18 +280,12 @@ def plot_complexity_comparison(
         linespacing=1.1,
         zorder=2,
     )
-    key_lines: list[str] = []
     if baselines is not None:
         key_lines = [
             r"$\mathbf{100\,\%}$ means",
             f"{_key_symbol(x_metric)} = {_format_baseline(baselines[0])}",
             f"{_key_symbol(y_metric)} = {_format_baseline(baselines[1])}",
         ]
-    if show_coefficients:
-        rho = spearmanr(plotted[x_metric], plotted[y_metric]).statistic
-        tau = kendalltau(plotted[x_metric], plotted[y_metric]).statistic
-        key_lines += [rf"$\rho={rho:.3f}$", rf"$\tau={tau:.3f}$"]
-    if key_lines:
         axis.text(
             *BASELINE_BOX_POSITION,
             "\n".join(key_lines),

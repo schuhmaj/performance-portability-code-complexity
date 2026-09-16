@@ -1,7 +1,8 @@
-"""Command-line orchestration for P3 analysis."""
+"""Command-line orchestration for P2 and P3 analysis."""
 
 from __future__ import annotations
 
+import argparse
 import sys
 
 import pandas as pd
@@ -11,6 +12,7 @@ from loguru import logger
 from ppbcc.constants import (
     APPLICATION,
     APPLICATION_EFFICIENCY,
+    BENCHMARK_PROBLEM,
     HARDWARE,
     PERFORMANCE_PORTABILITY,
     PRECISION,
@@ -34,7 +36,11 @@ from ppbcc.performance_portability.metrics import (
     calculate_metrics_by_size,
     calculate_scaling_metrics,
 )
-from ppbcc.performance_portability.options import build_parser
+from ppbcc.performance_portability.options import (
+    P3_CHARTS,
+    build_p2_parser,
+    build_p3_parser,
+)
 from ppbcc.performance_portability.selection import (
     ALL_SIZE,
     AVERAGE_OVER_PP,
@@ -60,8 +66,8 @@ from ppbcc.plot.styles import (
 )
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Run the P3 analysis command-line program.
+def p2analysis_main(argv: list[str] | None = None) -> int:
+    """Run the P2 analysis command-line program (benchmark results only).
 
     Args:
         argv: Command-line arguments, or ``None`` to read ``sys.argv``.
@@ -69,41 +75,84 @@ def main(argv: list[str] | None = None) -> int:
     Returns:
         Process exit status: zero on success, one on failure.
     """
-    args = build_parser().parse_args(argv)
+    args = build_p2_parser().parse_args(argv)
     configure_logging(args.verbose)
+    if args.hardware is not None and args.chart != "boxplot":
+        logger.error("--hardware is only valid for boxplot charts.")
+        return 1
+    return _analyze(args)
+
+
+def p3analysis_main(argv: list[str] | None = None) -> int:
+    """Run the P3 analysis command-line program (benchmarks and complexity).
+
+    Args:
+        argv: Command-line arguments, or ``None`` to read ``sys.argv``.
+
+    Returns:
+        Process exit status: zero on success, one on failure.
+    """
+    args = build_p3_parser().parse_args(argv)
+    configure_logging(args.verbose)
+    if args.chart == "complexity-comparison" and args.complexity_absolute:
+        logger.error(
+            "complexity-comparison compares two metrics on one shared scale "
+            "relative to CPP, which --complexity-metric-absolute removes."
+        )
+        return 1
+    return _analyze(args)
+
+
+def _resolve_problem_query(benchmark_data: pd.DataFrame, name: str | None) -> str:
+    """Return the problem query, defaulting to the only problem in the data.
+
+    Args:
+        benchmark_data: Combined benchmark results.
+        name: User-supplied ``-n/--name`` query, or ``None``.
+
+    Returns:
+        The query to resolve against benchmark and complexity data.
+
+    Raises:
+        ValueError: If no name is given and the data holds several problems.
+    """
+    if name is not None:
+        return name
+    problems = sorted(
+        {str(value) for value in benchmark_data[BENCHMARK_PROBLEM].dropna().unique()}
+    )
+    if len(problems) != 1:
+        raise ValueError(
+            "The benchmark CSVs contain several problems; select one with "
+            f"-n/--name. Available problems: {problems}"
+        )
+    return problems[0]
+
+
+def _analyze(args: argparse.Namespace) -> int:
+    """Compute the metrics and render the chart selected on the command line.
+
+    Args:
+        args: Parsed arguments of ``p2analysis`` or ``p3analysis``. The
+            complexity options are only read for the P3 charts, the hardware
+            filter only for the boxplot.
+
+    Returns:
+        Process exit status: zero on success, one on failure.
+    """
     sns.set_theme(style="whitegrid", context="talk", font="DejaVu Sans")
+    uses_complexity = args.chart in P3_CHARTS
 
     try:
-        if args.hardware is not None and args.chart != "boxplot":
-            raise ValueError("--hardware is only valid for boxplot charts.")
         if args.legend_vertical and not args.legend:
             raise ValueError("--legend--vertical requires -l/--legend.")
-        if (
-            args.chart in {"navchart", "combined", "complexity-comparison"}
-            and args.complexity is None
-        ):
-            raise ValueError(f"--chart {args.chart} requires --complexity.")
-        if (
-            args.legend_comparison_coefficients
-            and args.chart != "complexity-comparison"
-        ):
-            raise ValueError(
-                "--legend-complexity-comparison-coefficients is only valid for "
-                "--chart complexity-comparison."
-            )
-        if args.chart == "complexity-comparison" and args.additive:
-            raise ValueError(
-                "--chart complexity-comparison compares two metrics on one "
-                "shared scale, which requires --normalize; --additive leaves "
-                "them in their own units."
-            )
         if args.chart == "boxplot" and args.size in {
             AVERAGE_SIZE,
             BEST_SIZE,
             WORST_SIZE,
         }:
             raise ValueError(
-                "--chart boxplot requires --size all or an exact numeric size; "
+                "boxplot requires --size all or an exact numeric size; "
                 f"{args.size!r} collapses the efficiency distribution."
             )
         if args.average_over != AVERAGE_OVER_PP and args.size != AVERAGE_SIZE:
@@ -111,34 +160,6 @@ def main(argv: list[str] | None = None) -> int:
                 f"--average-over {args.average_over} requires --size avg; the "
                 "other size modes do not average PP over sizes."
             )
-        if (args.normalize or args.additive) and (
-            args.complexity is None
-            or args.chart not in {"navchart", "combined", "complexity-comparison"}
-        ):
-            raise ValueError(
-                "--normalize/--additive are only valid for navchart, combined "
-                "and complexity-comparison with --complexity."
-            )
-        if args.log_complexity and args.chart not in {
-            "navchart",
-            "combined",
-            "complexity-comparison",
-        }:
-            raise ValueError(
-                "--log-complexity is only valid for navchart, combined and "
-                "complexity-comparison charts."
-            )
-        if args.log_size:
-            logger.warning(
-                "--log-size is deprecated and ignored: the combined scaling "
-                "panel is now a heatmap over the discrete benchmark sizes."
-            )
-        if (
-            args.chart not in {"navchart", "combined", "complexity-comparison"}
-            and args.complexity is not None
-            and not args.export_to_csv
-        ):
-            logger.warning(f"Ignoring --complexity for --chart {args.chart}.")
 
         benchmark_data = load_benchmark_csvs(args.csv_files)
         efficiency_frames: list[pd.DataFrame] = []
@@ -149,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
         boxplot_efficiency_frames: list[pd.DataFrame] = []
         problem_pairs: list[tuple[str, str]] = []
 
-        for problem_query in (args.name,):
+        for problem_query in (_resolve_problem_query(benchmark_data, args.name),):
             numeric_size = args.size if isinstance(args.size, float) else None
             selection_size = None if args.chart == "combined" else numeric_size
             all_size_rows, resolved_problem, description_is_workload = (
@@ -268,15 +289,13 @@ def main(argv: list[str] | None = None) -> int:
             export_portability = pd.concat(export_portability_frames, ignore_index=True)
 
         if args.chart in {"navchart", "combined"}:
-            assert args.complexity is not None
             navchart_frames: list[pd.DataFrame] = []
             for problem_query, resolved_problem in problem_pairs:
                 complexity, current_metric = load_complexity_data(
                     args.complexity,
                     problem_query,
                     args.complexity_metric,
-                    args.normalize,
-                    args.additive,
+                    normalize=not args.complexity_absolute,
                 )
                 if metric is not None and current_metric != metric:
                     raise ValueError(
@@ -306,7 +325,6 @@ def main(argv: list[str] | None = None) -> int:
         comparison_labels: tuple[str, str] | None = None
         comparison_baselines: tuple[float, float] | None = None
         if args.chart == "complexity-comparison":
-            assert args.complexity is not None
             comparison_frames: list[pd.DataFrame] = []
             baseline_sets: set[tuple[float, float]] = set()
             for problem_query, resolved_problem in problem_pairs:
@@ -324,7 +342,6 @@ def main(argv: list[str] | None = None) -> int:
                         problem_query,
                         request,
                         normalize=True,
-                        additive=False,
                     )
                     labels.append(label)
                     matched = merge_portability_complexity(
@@ -337,7 +354,7 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 if labels[0] == labels[1]:
                     raise ValueError(
-                        "--chart complexity-comparison needs two different "
+                        "complexity-comparison needs two different "
                         f"metrics; --compare-metric and --complexity-metric "
                         f"both resolve to {labels[0]!r}."
                     )
@@ -376,7 +393,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"Comparison data:\n{comparison_data.to_string(index=False)}"
             )
 
-        if args.export_to_csv and args.complexity is not None:
+        if args.export_to_csv and uses_complexity:
             assert export_efficiency is not None
             assert export_portability is not None
             enriched_efficiency_frames: list[pd.DataFrame] = []
@@ -420,10 +437,6 @@ def main(argv: list[str] | None = None) -> int:
             assert navchart_data is not None
             assert metric is not None
             scaling_data = pd.concat(scaling_frames, ignore_index=True)
-            if args.log_size and scaling_data[PROBLEM_SIZE].le(0.0).any():
-                raise ValueError(
-                    "--log-size requires all plotted problem sizes to be positive."
-                )
             figure = plot_cascade(
                 efficiency,
                 portability,
@@ -433,7 +446,6 @@ def main(argv: list[str] | None = None) -> int:
                 complexity_metric=metric,
                 scaling_data=scaling_data,
                 log_complexity=args.log_complexity,
-                log_size=args.log_size,
                 selected_size=None if args.size == ALL_SIZE else args.size,
                 average_over=args.average_over,
                 show_legends=not args.legend,
@@ -460,7 +472,6 @@ def main(argv: list[str] | None = None) -> int:
                 remove_description=args.remove_description,
                 log_axes=args.log_complexity,
                 show_legends=not args.legend,
-                show_coefficients=args.legend_comparison_coefficients,
                 baselines=comparison_baselines,
             )
         elif args.chart == "heatmap":
@@ -554,4 +565,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(p3analysis_main())

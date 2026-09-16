@@ -30,7 +30,6 @@ dependencies = [
     "matplotlib>=3.8",
     "numpy>=1.26",
     "seaborn>=0.13",
-    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]
@@ -38,10 +37,6 @@ test = ["pytest>=8.0"]
 
 [project.scripts]
 ppbcc = "ppbcc.__main__:main"
-ppbcc-code-complexity = "ppbcc.__main__:code_complexity_main"
-ppbcc-p3analysis = "ppbcc.__main__:p3analysis_main"
-ppbcc-benchmark = "ppbcc.__main__:benchmark_main"
-ppbcc-profile = "ppbcc.__main__:profile_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

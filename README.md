@@ -79,13 +79,11 @@ Everything is reachable through the single `ppbcc` executable:
 ppbcc code-complexity path/to/src -o complexity.csv
 ppbcc benchmark -b path/to/build -p . -r '.*nbody.*' -H RTX5080 -o results
 ppbcc profile -b path/to/build -p . -r '.*nbody.*' -H RTX5080 --roofline
-ppbcc p3analysis NBody results.csv --chart cascade -o nbody.pdf
+ppbcc p2analysis cascade results.csv -n NBody -o nbody.pdf
+ppbcc p3analysis navchart complexity.csv results.csv -n NBody
 ```
 
-Each command is also installed as a prefixed executable
-(`ppbcc-code-complexity`, `ppbcc-benchmark`, `ppbcc-profile`,
-`ppbcc-p3analysis`), and the
-package can be run as a module: `python -m ppbcc code-complexity src/`.
+The package can also be run as a module: `python -m ppbcc code-complexity src/`.
 
 > [!TIP]
 > The tables below list the options you reach for most often, not every option.
@@ -170,18 +168,23 @@ without it the launches are unnamed and all of them are kept, with a warning.
 > executables produce no report and are skipped with a warning; `--profiler
 > nsys` is what measures them.
 
-### `ppbcc p3analysis`
+### `ppbcc p2analysis` and `ppbcc p3analysis`
 
 Application efficiency, performance portability, and plots from benchmark CSVs.
+`p2analysis PLOT CSV...` renders the charts that need benchmark results only
+(`cascade`, `heatmap`, `boxplot`); `p3analysis PLOT COMPLEXITY_CSV CSV...`
+renders the charts that also need code complexity (`navchart`, `combined`,
+`complexity-comparison`).
 
 | Option | Meaning |
 | --- | --- |
-| `NAME` | Benchmark problem to plot; exact case-insensitive match preferred, unique substring accepted |
+| `PLOT` | Chart to render; the valid choices depend on the command |
+| `COMPLEXITY_CSV` | `p3analysis` only: code-complexity CSV with one row per implementation |
 | `CSV` | One or more CSVs produced by `ppbcc benchmark` |
-| `-c, --chart` | `cascade` (default), `navchart`, `combined`, `heatmap`, `boxplot` |
-| `--complexity` | Code-complexity CSV; **required** for `navchart` and `combined` |
-| `--complexity-metric` | SLOC, Halstead vocabulary/length/volume/difficulty/effort (default: `halstead-effort`) |
-| `--normalize` / `--additive` | Divide by, or subtract, the plain-C++ complexity score (mutually exclusive) |
+| `-n, --name` | Benchmark problem; exact case-insensitive match preferred, unique substring accepted. Optional when the CSVs hold one problem |
+| `-c, --complexity-metric` | `p3analysis` only: SLOC, Halstead vocabulary/length/volume/difficulty/effort (default: `halstead-difficulty`) |
+| `--complexity-metric-absolute` | `p3analysis` only: plot absolute complexity instead of a percentage of plain C++ |
+| `--compare-metric` | `complexity-comparison` only: x-axis metric (default: `sloc`) |
 | `-s, --size` | `all` (default), an exact size, or `avg`/`best`/`worst` |
 | `--average-over` | With `-s avg`: average Φ over sizes (`pp`, default) or compute Φ from size-averaged efficiencies (`efficiency`) |
 | `--non-zero-pp` | Calculate Φ over supported platforms only |
@@ -192,17 +195,15 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
 | `-o, --output` | Output path; defaults to `<problem>_<chart>.pdf` |
 
 ```bash
-ppbcc p3analysis MatrixMultiplication ./Results_* \
-  --complexity ./code-complexity/code-complexity.csv -c combined \
-  --complexity-metric halstead-difficulty --additive --log-size \
+ppbcc p3analysis combined ./code-complexity/code-complexity.csv ./Results_* \
+  -n MatrixMultiplication -c halstead-difficulty --log-complexity \
   --non-zero-pp --remove-description -s avg -x "Cublas"
 ```
 
 Not every option applies to every chart, and invalid combinations are rejected
-rather than silently ignored: `--complexity` affects only `navchart`/`combined`,
-`--normalize`/`--additive` require one of those two together with
-`--complexity`, `--log-size` is `combined`-only, `-H/--hardware` is
-`boxplot`-only, and `boxplot` needs `-s all` or an exact numeric size.
+rather than silently ignored: `-H/--hardware` is `boxplot`-only, `boxplot`
+needs `-s all` or an exact numeric size, and `complexity-comparison` rejects
+`--complexity-metric-absolute`.
 See [`examples/`](examples/) for one rendered example of every chart together
 with the exact command that produced it.
 

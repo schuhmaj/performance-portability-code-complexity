@@ -377,7 +377,7 @@ Run it with:
     python scripts/generate_code_complexity.py --dry-run
 
 The resulting ``results/code-complexity/code-complexity.csv`` is exactly the
-file passed to ``ppbcc p3analysis --complexity`` in :doc:`plots`.
+file passed to ``ppbcc p3analysis`` as ``COMPLEXITY_CSV`` in :doc:`plots`.
 
 .. _code-complexity-references:
 

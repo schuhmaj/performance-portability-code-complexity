@@ -44,7 +44,7 @@ repository's ``results/`` folder are produced, one per hardware platform:
       -H "AMD Instinct MI210" -o "Results_AMD_Instinct_MI210"
 
 The ``-H/--hardware`` value ends up in the ``Hardware`` column and is what
-``ppbcc p3analysis`` treats as a *platform* when computing performance
+``ppbcc p2analysis``/``p3analysis`` treat as a *platform* when computing performance
 portability — so keep it consistent across runs.
 
 Output format

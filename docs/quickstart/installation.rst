@@ -57,7 +57,8 @@ Dependencies
 
     The :doc:`code-complexity workflow <../usage/code_complexity>` is
     stand-alone — it only needs ``pandas``, ``loguru``, and ``tabulate``. The
-    plotting dependencies are only exercised by ``ppbcc p3analysis``.
+    plotting dependencies are only exercised by ``ppbcc p2analysis`` and
+    ``ppbcc p3analysis``.
 
 Verifying the installation
 --------------------------

@@ -3,8 +3,9 @@
 Available Plots
 ===============
 
-``ppbcc p3analysis -c/--chart`` renders five chart types. All of them are shown
-below for the same benchmark problem, so they can be compared directly.
+``ppbcc p2analysis`` and ``ppbcc p3analysis`` render six chart types, selected
+by their first argument. All of them are shown below, all but one for the same
+benchmark problem, so they can be compared directly.
 
 .. admonition:: Where this data comes from
    :class: note
@@ -14,8 +15,7 @@ below for the same benchmark problem, so they can be compared directly.
    `performance-portability-benchmark <https://github.com/schuhmaj/performance-portability-benchmark>`__.
 
    * **Runtimes** — the per-platform ``Results_*.csv`` files
-     (``Results_AMD_Instinct_MI210.csv``,
-     ``Results_INTEL_Data_Center_GPU_Max_1550.csv``,
+     (``Results_AMD_MI210.csv``, ``Results_Intel_Max_1550.csv``,
      ``Results_NVIDIA_GH200.csv``, ``Results_NVIDIA_RTX3080.csv``,
      ``Results_NVIDIA_RTX4060.csv``, ``Results_NVIDIA_RTX5080.csv``), each
      consolidated from Google Benchmark JSON reports by
@@ -28,25 +28,27 @@ below for the same benchmark problem, so they can be compared directly.
    The shown problem is **matrix multiplication** across six GPU platforms,
    averaged over benchmark sizes, with the cuBLAS reference excluded so the
    vendor library does not define the efficiency baseline on its own.
+   The complexity comparison shows **vector addition** instead, whose small
+   implementations make the difference between the two metrics easy to read.
    The source PDFs live in the ``examples/`` folder of this repository.
 
 Chart overview
 --------------
 
 +---------------------------+-------------------------------------------------+-------------------+
-| Chart                     | Shows                                           | Needs complexity? |
+| Chart                     | Shows                                           | Command           |
 +===========================+=================================================+===================+
-| ``cascade``               | Efficiency decay across ranked platforms + PP   | no                |
+| ``cascade``               | Efficiency decay across ranked platforms + PP   | ``p2analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
-| ``navchart``              | PP against code complexity                      | **yes**           |
+| ``navchart``              | PP against code complexity                      | ``p3analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
-| ``combined``              | Cascade + Navchart + size scaling in one figure | **yes**           |
+| ``combined``              | Cascade + Navchart + size scaling in one figure | ``p3analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
-| ``complexity-comparison`` | Two complexity metrics against each other       | **yes**           |
+| ``complexity-comparison`` | Two complexity metrics against each other       | ``p3analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
-| ``heatmap``               | Efficiency per paradigm and platform            | no                |
+| ``heatmap``               | Efficiency per paradigm and platform            | ``p2analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
-| ``boxplot``               | Efficiency distribution per paradigm            | no                |
+| ``boxplot``               | Efficiency distribution per paradigm            | ``p2analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
 
 Cascade plot
@@ -64,11 +66,11 @@ identifies which device sits at which rank for each paradigm.
    :width: 100%
    :class: plot-figure
 
-   ``-c cascade`` — efficiency decay, :math:`\Phi`, and the platform ranking.
+   ``cascade`` — efficiency decay, :math:`\Phi`, and the platform ranking.
 
 .. code-block:: bash
 
-    ppbcc p3analysis MatrixMultiplication ./Results_* -c cascade \
+    ppbcc p2analysis cascade ./Results_* -n MatrixMultiplication \
       --non-zero-pp --remove-description -s avg -x "Cublas"
 
 Navchart
@@ -76,22 +78,21 @@ Navchart
 
 The Navchart places each implementation at its code complexity (x-axis) and its
 performance portability (y-axis). The upper-left corner is the goal: portable
-*and* cheap to write. Pick the complexity axis with ``--complexity-metric``,
-and use ``--normalize``/``--additive`` to express complexity relative to the
-plain-C++ implementation.
+*and* cheap to write. Pick the complexity axis with ``-c/--complexity-metric``.
+Complexity is expressed as a percentage of the plain-C++ implementation unless
+``--complexity-metric-absolute`` is given.
 
 .. figure:: ../figures/matrixmultiplication_navchart.svg
    :alt: Navchart of performance portability against Halstead difficulty
    :width: 80%
    :class: plot-figure
 
-   ``-c navchart`` — :math:`\Phi` against absolute Halstead difficulty.
+   ``navchart`` — :math:`\Phi` against absolute Halstead difficulty.
 
 .. code-block:: bash
 
-    ppbcc p3analysis MatrixMultiplication ./Results_* \
-      --complexity ./code-complexity/code-complexity.csv -c navchart \
-      --complexity-metric halstead-difficulty \
+    ppbcc p3analysis navchart ./code-complexity/code-complexity.csv ./Results_* \
+      -n MatrixMultiplication -c halstead-difficulty --complexity-metric-absolute \
       --non-zero-pp --remove-description -s avg -x "Cublas"
 
 Combined chart
@@ -106,29 +107,25 @@ one to put in a paper when you have room for exactly one figure.
    :width: 100%
    :class: plot-figure
 
-   ``-c combined`` — Cascade, Navchart (normalized complexity), and performance
+   ``combined`` — Cascade, Navchart (normalized complexity), and performance
    portability over problem size.
 
 .. code-block:: bash
 
-    ppbcc p3analysis MatrixMultiplication ./Results_* \
-      --complexity ./code-complexity/code-complexity.csv -c combined \
-      --complexity-metric halstead-difficulty --normalize --log-complexity \
+    ppbcc p3analysis combined ./code-complexity/code-complexity.csv ./Results_* \
+      -n MatrixMultiplication -c halstead-difficulty --log-complexity \
       --non-zero-pp --remove-description -s avg -x "Cublas"
 
-``--normalize`` puts the Navchart panel on a *percentage of plain C++* axis.
-Every value is then positive, which is what makes ``--log-complexity`` usable —
-and the log axis matters whenever one implementation dwarfs the rest, as the
-two CUDA polyhedral implementations do at roughly 500 % of the baseline.
-``--additive`` remains available and ranks paradigms identically, but can yield
-non-positive values that a logarithmic axis cannot show.
+The Navchart panel sits on a *percentage of plain C++* axis. Every value is
+positive, which is what makes ``--log-complexity`` usable — and the log axis
+matters whenever one implementation dwarfs the rest, as the two CUDA polyhedral
+implementations do at roughly 500 % of the baseline.
 
 The scaling panel is a **heatmap** over the benchmark sizes, one row per
 implementation and one column per size, because a line per implementation
 becomes unreadable beyond a handful of paradigms. Its rows keep the
 descending-:math:`\Phi` order of the platform-ranking panel beside it, so the
-two lower panels line up row for row. ``--log-size`` is consequently obsolete:
-the axis is categorical, and the option is accepted but ignored with a warning.
+two lower panels line up row for row.
 
 Column labels become exponents whenever every size is an exact power of one
 base — :math:`2^5 \ldots 2^{14}`, :math:`10^1 \ldots 10^8` — which is short
@@ -146,18 +143,24 @@ y-axis metric charges a paradigm more than the x-axis one — *dense lines* — 
 below it the x-axis metric charges more — *verbose code*, which is how the two
 half-planes are captioned.
 
+.. figure:: ../figures/vecadd_complexity_comparison.svg
+   :alt: Halstead difficulty against SLOC for vector addition
+   :width: 80%
+   :class: plot-figure
+
+   ``complexity-comparison`` — Halstead difficulty against SLOC for vector
+   addition, both relative to plain C++.
+
 .. code-block:: bash
 
-    ppbcc p3analysis MatrixMultiplication ./Results_* \
-      --complexity ./code-complexity/code-complexity.csv \
-      -c complexity-comparison --complexity-metric halstead-difficulty \
-      --compare-metric sloc --log-complexity \
-      --non-zero-pp --remove-description -s avg -x "Cublas"
+    ppbcc p3analysis complexity-comparison ./code-complexity/code-complexity.csv \
+      ./Results_* -n VecAdd -c halstead-difficulty --compare-metric sloc \
+      --log-complexity --non-zero-pp -s avg -x "Cublas" --remove-description
 
-``--compare-metric`` names the x-axis metric and ``--complexity-metric`` the y
-axis; both take the usual metric names and aliases. Because the identity line
-only means something on a shared relative scale, the chart always normalizes
-and rejects ``--additive``. ``-l`` suppresses the in-plot legend *and* the
+``--compare-metric`` names the x-axis metric and ``-c/--complexity-metric`` the
+y axis; both take the usual metric names and aliases. Because the identity line
+only means something on a shared relative scale, the chart rejects
+``--complexity-metric-absolute``. ``-l`` suppresses the in-plot legend *and* the
 per-point paradigm labels, for placing the chart next to a shared legend.
 
 A key on the right states the absolute plain-C++ values behind the 100 % of
@@ -167,10 +170,8 @@ paradigm below the identity line on one axis is rarely far below it on the
 other. A chart spanning several problems has several baselines and therefore no
 key.
 
-Spearman's :math:`\rho` and Kendall's :math:`\tau` are not drawn by default;
-``--legend-complexity-comparison-coefficients`` appends them to that key rather
-than opening a second box. They belong in the running text, where they can be
-given to three decimals and discussed.
+Spearman's :math:`\rho` and Kendall's :math:`\tau` are not drawn; they belong
+in the running text, where they can be given to three decimals and discussed.
 
 Efficiency heatmap
 ------------------
@@ -186,11 +187,11 @@ to :math:`[0, 1]`, so heatmaps of different problems remain comparable.
    :width: 100%
    :class: plot-figure
 
-   ``-c heatmap -s 16384`` — application efficiency at one problem size.
+   ``heatmap -s 16384`` — application efficiency at one problem size.
 
 .. code-block:: bash
 
-    ppbcc p3analysis MatrixMultiplication ./Results_* -c heatmap \
+    ppbcc p2analysis heatmap ./Results_* -n MatrixMultiplication \
       --non-zero-pp --remove-description -s 16384 -x "Cublas"
 
 Efficiency boxplot
@@ -207,11 +208,11 @@ performance. Paradigms are sorted alphabetically.
    :width: 100%
    :class: plot-figure
 
-   ``-c boxplot -s all`` — efficiency spread across platforms and sizes.
+   ``boxplot -s all`` — efficiency spread across platforms and sizes.
 
 .. code-block:: bash
 
-    ppbcc p3analysis MatrixMultiplication ./Results_* -c boxplot \
+    ppbcc p2analysis boxplot ./Results_* -n MatrixMultiplication \
       --non-zero-pp --remove-description -s all -x "Cublas"
 
 Boxplots accept only ``-s all`` or an exact numeric size — the ``avg``,

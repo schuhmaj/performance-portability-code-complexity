@@ -109,27 +109,12 @@ def test_half_planes_are_captioned_for_the_reader():
     plt.close(figure)
 
 
-def test_correlation_coefficients_are_opt_in():
-    hidden = plot_complexity_comparison(
-        _data(), SLOC, DIFFICULTY, "VecAdd", show_legends=False
-    )
-    assert not [t for t in hidden.axes[0].texts if r"\rho" in t.get_text()]
-    plt.close(hidden)
-
-    shown = plot_complexity_comparison(
-        _data(), SLOC, DIFFICULTY, "VecAdd", show_legends=False,
-        show_coefficients=True,
-    )
-    assert [t for t in shown.axes[0].texts if r"\rho" in t.get_text()]
-    plt.close(shown)
-
-
 def _key(figure: plt.Figure) -> str | None:
     """Return the baseline key of a comparison figure, if it has one."""
     keys = [
         text.get_text()
         for text in figure.axes[0].texts
-        if "means" in text.get_text() or r"\rho" in text.get_text()
+        if "means" in text.get_text()
     ]
     return keys[0] if keys else None
 
@@ -161,26 +146,6 @@ def test_baseline_key_is_absent_without_baselines():
     plt.close(figure)
 
 
-def test_coefficients_extend_the_baseline_key():
-    figure = plot_complexity_comparison(
-        _data(),
-        SLOC,
-        DIFFICULTY,
-        "VecAdd",
-        show_legends=False,
-        baselines=(173.0, 102.88),
-        show_coefficients=True,
-    )
-    key = _key(figure)
-    assert key is not None
-    # One box, not two: a second one would have to sit somewhere the first
-    # does not, and both corners on that side are already spoken for.
-    assert "SLOC = 173" in key
-    assert r"\rho" in key
-    assert len([t for t in figure.axes[0].texts if "means" in t.get_text()]) == 1
-    plt.close(figure)
-
-
 def test_baseline_key_clears_the_lower_right_caption():
     figure = plot_complexity_comparison(
         _data(),
@@ -205,7 +170,7 @@ def test_baseline_key_clears_the_lower_right_caption():
     [
         ("Halstead Difficulty [normalized]", "Halstead $D$ [% of sequential C++]"),
         ("Source Lines of Code [normalized]", "SLOC [% of sequential C++]"),
-        ("Halstead Difficulty [additive]", "Halstead $D$ [added over sequential C++]"),
+        ("Halstead Difficulty [absolute]", "Halstead $D$ [absolute]"),
         # An unknown metric or scaling mode must survive unchanged.
         ("Cyclomatic Complexity [normalized]", "Cyclomatic Complexity [normalized]"),
         ("Halstead Volume [rescaled]", "Halstead Volume [rescaled]"),

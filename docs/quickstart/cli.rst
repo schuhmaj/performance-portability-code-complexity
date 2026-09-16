@@ -12,12 +12,10 @@ Everything is reachable through the single ``ppbcc`` executable:
     ppbcc code-complexity SOURCES...   # Halstead / LOC metrics
     ppbcc benchmark -r REGEX...        # run and consolidate benchmarks
     ppbcc profile -r REGEX...          # profile kernels (ncu or likwid), roofline model
-    ppbcc p3analysis NAME CSV...       # efficiency, portability, plots
+    ppbcc p2analysis PLOT CSV...       # efficiency and portability plots
+    ppbcc p3analysis PLOT COMPLEXITY_CSV CSV...  # portability over code complexity
 
-Each command is also installed as a prefixed executable
-(``ppbcc-code-complexity``, ``ppbcc-benchmark``, ``ppbcc-profile``,
-``ppbcc-p3analysis``), and the
-package can be run as a module:
+The package can also be run as a module:
 
 .. code-block:: bash
 
@@ -142,10 +140,17 @@ one row per kernel launch) or ``likwid`` (one row per marked region, needs
 
 Details and examples: :doc:`../usage/profiling`.
 
-``ppbcc p3analysis``
---------------------
+``ppbcc p2analysis`` / ``ppbcc p3analysis``
+-------------------------------------------
 
 Application efficiency, performance portability, and plots from benchmark CSVs.
+``p2analysis`` renders the charts that need benchmark results only,
+``p3analysis`` those that also need code complexity.
+
+.. code-block:: bash
+
+    ppbcc p2analysis PLOT CSV [CSV ...] [options]
+    ppbcc p3analysis PLOT COMPLEXITY_CSV CSV [CSV ...] [options]
 
 .. list-table::
    :header-rows: 1
@@ -153,23 +158,25 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
 
    * - Option
      - Meaning
-   * - ``NAME``
-     - Benchmark problem to plot; exact case-insensitive match preferred, unique substring okay
+   * - ``PLOT``
+     - ``p2analysis``: ``cascade``, ``heatmap``, ``boxplot``;
+       ``p3analysis``: ``navchart``, ``combined``, ``complexity-comparison``
+   * - ``COMPLEXITY_CSV``
+     - ``p3analysis`` only: code-complexity CSV with one row per implementation
    * - ``CSV``
      - One or more CSVs produced by ``ppbcc benchmark``
-   * - ``-c, --chart``
-     - ``cascade`` (default), ``navchart``, ``combined``, ``complexity-comparison``, ``heatmap``, ``boxplot``
-   * - ``--complexity``
-     - Code-complexity CSV; **required** for ``navchart``, ``combined`` and ``complexity-comparison``
-   * - ``--complexity-metric``
-     - SLOC, Halstead vocabulary/length/volume/difficulty/effort (default: ``halstead-effort``)
+   * - ``-n, --name``
+     - Benchmark problem to plot; exact case-insensitive match preferred, unique substring okay.
+       May be omitted when the CSVs contain exactly one problem
+   * - ``-c, --complexity-metric``
+     - ``p3analysis`` only: SLOC, Halstead vocabulary/length/volume/difficulty/effort
+       (default: ``halstead-difficulty``)
+   * - ``--complexity-metric-absolute``
+     - ``p3analysis`` only: plot absolute values instead of a percentage of the plain-C++ score
    * - ``--compare-metric``
-     - x-axis metric of ``complexity-comparison`` (default: ``sloc``); ``--complexity-metric`` is its y axis
-   * - ``--legend-complexity-comparison-coefficients``
-     - Add Spearman's rho and Kendall's tau to the ``complexity-comparison``
-       baseline key (off by default)
-   * - ``--normalize`` / ``--additive``
-     - Divide by, or subtract, the plain-C++ complexity score (mutually exclusive)
+     - x-axis metric of ``complexity-comparison`` (default: ``sloc``); ``-c`` is its y axis
+   * - ``--log-complexity``
+     - ``p3analysis`` only: logarithmic complexity axes
    * - ``-s, --size``
      - ``all`` (default), an exact size, or ``avg``/``best``/``worst``
    * - ``--average-over``
@@ -178,12 +185,14 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
      - Compute :math:`\Phi` over supported platforms only
    * - ``-x, --exclude`` / ``-i, --include``
      - Regex filters on the ``Description`` column
+   * - ``-H, --hardware``
+     - ``p2analysis`` only: restrict a ``boxplot`` to one platform
    * - ``--remove-description``
      - Drop bracketed labels such as ``[Naive]``; efficiency charts combine variants by paradigm
    * - ``-l, --legend``
      - Save the legend as a separate PDF (add ``--legend--vertical`` for a single column)
    * - ``-e, --export-to-csv``
-     - Also export efficiency and portability data as CSV
+     - Also export efficiency and portability data as CSV; ``p3analysis`` adds every complexity metric
    * - ``-o, --output``
      - Output path; defaults to ``<problem>_<chart>.pdf``
 
@@ -201,20 +210,11 @@ combinations rather than silently ignoring them:
 
    * - Option
      - Valid for
-   * - ``--complexity``
-     - ``navchart``, ``combined``, ``complexity-comparison`` (warned and ignored elsewhere)
-   * - ``--normalize``/``--additive``
-     - ``navchart``, ``combined``, together with ``--complexity``; ``complexity-comparison``
-       always normalizes and rejects ``--additive``
-   * - ``--log-complexity``
-     - ``navchart``, ``combined``, ``complexity-comparison``
+   * - ``--complexity-metric-absolute``
+     - ``navchart``, ``combined``; ``complexity-comparison`` always compares
+       percentages of the plain-C++ baseline and rejects it
    * - ``--compare-metric``
      - ``complexity-comparison`` only
-   * - ``--legend-complexity-comparison-coefficients``
-     - ``complexity-comparison`` only
-   * - ``--log-size``
-     - Deprecated: the ``combined`` scaling panel is a heatmap over the discrete
-       benchmark sizes, so the option is accepted but ignored, with a warning
    * - ``-H, --hardware``
      - ``boxplot`` only
    * - ``-s avg``/``best``/``worst``

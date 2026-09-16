@@ -230,7 +230,6 @@ def plot_cascade(
     complexity_metric: str | None = None,
     scaling_data: pd.DataFrame | None = None,
     log_complexity: bool = False,
-    log_size: bool = False,
     selected_size: float | str | None = None,
     average_over: str = AVERAGE_OVER_PP,
     show_legends: bool = True,
@@ -246,9 +245,6 @@ def plot_cascade(
         complexity_metric: Complexity column used in combined mode.
         scaling_data: Optional per-size PP data for combined mode.
         log_complexity: Whether the complexity axis is logarithmic.
-        log_size: Deprecated and ignored. The scaling panel is a categorical
-            heatmap over benchmark sizes, which has no continuous axis to
-            scale logarithmically.
         selected_size: Optional benchmark size or size-summary mode for the two
             upper panels.
         average_over: For an averaged size, whether PP was averaged over the

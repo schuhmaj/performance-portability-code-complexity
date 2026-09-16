@@ -1,14 +1,17 @@
 # Example Plots
 
-This folder holds one rendered example of every chart `ppbcc p3analysis` can
-produce. All five show the same benchmark problem — **matrix multiplication**
-across six GPU platforms — so the charts can be compared directly.
+This folder holds one rendered example of every chart `ppbcc p2analysis` and
+`ppbcc p3analysis` can produce. All but the complexity comparison show the same
+benchmark problem — **matrix multiplication** across six GPU platforms — so the
+charts can be compared directly; the complexity comparison shows **vector
+addition**.
 
 | File | Chart | Shows |
 | --- | --- | --- |
 | [`matrixmultiplication_cascade.pdf`](matrixmultiplication_cascade.pdf) | `cascade` | Efficiency decay across ranked platforms, plus performance portability Φ |
 | [`matrixmultiplication_navchart.pdf`](matrixmultiplication_navchart.pdf) | `navchart` | Φ plotted against code complexity |
 | [`matrixmultiplication_combined.pdf`](matrixmultiplication_combined.pdf) | `combined` | Cascade + Navchart + problem-size scaling in one figure |
+| [`vecadd_complexity_comparison.pdf`](vecadd_complexity_comparison.pdf) | `complexity-comparison` | Halstead difficulty against SLOC, both relative to plain C++ |
 | [`matrixmultiplication_heatmap.pdf`](matrixmultiplication_heatmap.pdf) | `heatmap` | Application efficiency per paradigm and platform |
 | [`matrixmultiplication_boxplot.pdf`](matrixmultiplication_boxplot.pdf) | `boxplot` | Application-efficiency distribution per paradigm |
 
@@ -22,8 +25,8 @@ Both input files live in the `results/` folder of the companion repository
 [performance-portability-benchmark](https://github.com/schuhmaj/performance-portability-benchmark):
 
 - **Runtimes** — the per-platform `Results_*.csv` files
-  (`Results_AMD_Instinct_MI210.csv`,
-  `Results_INTEL_Data_Center_GPU_Max_1550.csv`, `Results_NVIDIA_GH200.csv`,
+  (`Results_AMD_MI210.csv`, `Results_Intel_Max_1550.csv`,
+  `Results_NVIDIA_GH200.csv`,
   `Results_NVIDIA_RTX3080.csv`, `Results_NVIDIA_RTX4060.csv`,
   `Results_NVIDIA_RTX5080.csv`), each consolidated from Google Benchmark JSON
   reports by `ppbcc benchmark`.
@@ -51,50 +54,54 @@ The shared options are:
 ### Cascade
 
 ```bash
-ppbcc p3analysis MatrixMultiplication ./Results_* -c cascade \
+ppbcc p2analysis cascade ./Results_* -n MatrixMultiplication \
   --non-zero-pp --remove-description -s avg -x "Cublas"
 ```
 
 ### Navchart
 
 ```bash
-ppbcc p3analysis MatrixMultiplication ./Results_* \
-  --complexity ./code-complexity/code-complexity.csv -c navchart \
-  --complexity-metric halstead-difficulty \
+ppbcc p3analysis navchart ./code-complexity/code-complexity.csv ./Results_* \
+  -n MatrixMultiplication -c halstead-difficulty --complexity-metric-absolute \
   --non-zero-pp --remove-description -s avg -x "Cublas"
 ```
 
 ### Combined
 
 ```bash
-ppbcc p3analysis MatrixMultiplication ./Results_* \
-  --complexity ./code-complexity/code-complexity.csv -c combined \
-  --complexity-metric halstead-difficulty --additive --log-size \
+ppbcc p3analysis combined ./code-complexity/code-complexity.csv ./Results_* \
+  -n MatrixMultiplication -c halstead-difficulty --log-complexity \
   --non-zero-pp --remove-description -s avg -x "Cublas"
+```
+
+### Complexity comparison
+
+```bash
+ppbcc p3analysis complexity-comparison ./code-complexity/code-complexity.csv ./Results_* \
+  -n VecAdd -c halstead-difficulty --compare-metric sloc \
+  --log-complexity --non-zero-pp -s avg -x "Cublas" --remove-description
 ```
 
 ### Heatmap
 
 ```bash
-ppbcc p3analysis MatrixMultiplication ./Results_* -c heatmap \
+ppbcc p2analysis heatmap ./Results_* -n MatrixMultiplication \
   --non-zero-pp --remove-description -s 16384 -x "Cublas"
 ```
 
 ### Boxplot
 
 ```bash
-ppbcc p3analysis MatrixMultiplication ./Results_* -c boxplot \
+ppbcc p2analysis boxplot ./Results_* -n MatrixMultiplication \
   --non-zero-pp --remove-description -s all -x "Cublas"
 ```
 
 > [!NOTE]
-> `ppbcc p3analysis` rejects option/chart combinations that would be silently
-> misleading rather than ignoring them:
-> - `--complexity` only affects `navchart` and `combined`; elsewhere it is
->   warned about and ignored.
-> - `--normalize`/`--additive` require `navchart` or `combined` **with**
->   `--complexity`.
-> - `--log-size` is valid for `combined` only.
+> `ppbcc p2analysis` and `ppbcc p3analysis` reject option/chart combinations
+> that would be silently misleading rather than ignoring them:
+> - `complexity-comparison` rejects `--complexity-metric-absolute`, because its
+>   identity line needs both metrics relative to plain C++.
+> - `-H/--hardware` is valid for `boxplot` only.
 > - `boxplot` needs `-s all` or an exact numeric size; `avg`, `best`, and
 >   `worst` collapse the distribution the chart exists to show.
 

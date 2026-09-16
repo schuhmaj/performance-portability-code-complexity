@@ -237,7 +237,6 @@ SHORT_METRIC_NAMES = {
 #: How each scaling mode of the complexity loader is spelled out on an axis.
 SCALING_SUFFIXES = {
     "normalized": "[% of sequential C++]",
-    "additive": "[added over sequential C++]",
     "absolute": "[absolute]",
 }
 

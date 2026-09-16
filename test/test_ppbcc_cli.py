@@ -5,7 +5,13 @@ from ppbcc.__main__ import build_parser, main
 
 def test_parser_lists_all_workflows():
     parser = build_parser()
-    for command in ("benchmark", "profile", "code-complexity", "p3analysis"):
+    for command in (
+        "benchmark",
+        "profile",
+        "code-complexity",
+        "p2analysis",
+        "p3analysis",
+    ):
         args = parser.parse_args([command, "--help"])
         assert args.command == command
         assert args.arguments == ["--help"]

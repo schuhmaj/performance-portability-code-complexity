@@ -3,9 +3,11 @@
 P3 Analysis
 ===========
 
-``ppbcc p3analysis`` turns benchmark CSVs (and, optionally, a code-complexity
-CSV) into application-efficiency and performance-portability figures, then
-renders them as one of five charts. The chart gallery lives in :doc:`plots`;
+``ppbcc p2analysis`` and ``ppbcc p3analysis`` turn benchmark CSVs into
+application-efficiency and performance-portability figures. ``p2analysis``
+renders the charts that need benchmark results only; ``p3analysis`` joins a
+code-complexity CSV and renders the charts that set portability against
+complexity. The chart gallery lives in :doc:`plots`;
 this page covers the metrics and the data selection behind them.
 
 The metrics implemented here are those of Pennycook et al. [Pennycook2019]_
@@ -15,11 +17,13 @@ accompanies that work. See :ref:`p3analysis-references`.
 
 .. code-block:: bash
 
-    ppbcc p3analysis NAME CSV [CSV ...] [options]
+    ppbcc p2analysis PLOT CSV [CSV ...] [options]
+    ppbcc p3analysis PLOT COMPLEXITY_CSV CSV [CSV ...] [options]
 
-``NAME`` selects the benchmark problem. An exact case-insensitive match wins;
-a unique substring is accepted, so ``Polyhedral`` resolves to
-``PolyhedralGravity``.
+``-n/--name`` selects the benchmark problem. An exact case-insensitive match
+wins; a unique substring is accepted, so ``Polyhedral`` resolves to
+``PolyhedralGravity``. It may be omitted when the benchmark CSVs contain exactly
+one problem.
 
 Metrics
 -------
@@ -107,7 +111,7 @@ move, since they otherwise define the efficiency baseline:
 
 .. code-block:: bash
 
-    ppbcc p3analysis MatrixMultiplication ./Results_* -x "Cublas"
+    ppbcc p2analysis cascade ./Results_* -n MatrixMultiplication -x "Cublas"
 
 ``--remove-description`` drops bracketed labels such as ``[Naive]`` from
 labels and legends; efficiency charts then combine variants by paradigm.
@@ -117,11 +121,11 @@ labels and legends; efficiency charts then combine variants by paradigm.
 Joining code complexity
 -----------------------
 
-``--complexity`` takes the implementation-level CSV described in
+``p3analysis`` takes the implementation-level CSV described in
 :ref:`code-complexity-applied-example`. Its ``Name``/``Framework`` columns are
 matched against the benchmark problem and paradigm labels, and its raw Halstead
 counts (``n1``, ``n2``, ``N1``, ``N2``) are used to derive the metric selected
-by ``--complexity-metric``:
+by ``-c/--complexity-metric``:
 
 +---------------------------+-------------------------------+---------------------------+
 | Metric                    | Accepted aliases              | Definition                |
@@ -137,27 +141,18 @@ by ``--complexity-metric``:
 | ``halstead-volume``       | ``volume``, ``v``             | :math:`N \log_2 \eta`     |
 +---------------------------+-------------------------------+---------------------------+
 | ``halstead-difficulty``   | ``difficulty``, ``d``         | :math:`\frac{n_1}{2}      |
-|                           |                               | \cdot \frac{N_2}{n_2}`    |
+| (default)                 |                               | \cdot \frac{N_2}{n_2}`    |
 +---------------------------+-------------------------------+---------------------------+
 | ``halstead-effort``       | ``effort``, ``e``             | :math:`D \cdot V`         |
-| (default)                 |                               |                           |
+|                           |                               |                           |
 +---------------------------+-------------------------------+---------------------------+
 
 Matching is case-insensitive and treats ``_``, ``-``, and spaces alike, so
 ``Halstead Difficulty`` and ``halstead_difficulty`` both work.
 
-Two options put the numbers into perspective relative to the plain-C++
-implementation:
-
-* ``--normalize`` divides every score by the CPP score, so CPP sits at 100 %.
-* ``--additive`` subtracts the CPP score, showing the complexity a paradigm
-  *adds* over the sequential baseline.
-
-.. warning::
-
-    ``--additive`` can produce non-positive values when a paradigm is terser
-    than the CPP reference. Do not combine it with ``--log-complexity`` in that
-    case.
+Complexity is put into perspective relative to the plain-C++ implementation
+by default: every score is divided by the CPP score, so CPP sits at 100 %.
+``--complexity-metric-absolute`` plots the raw scores instead.
 
 CSV export
 ----------
@@ -167,7 +162,7 @@ performance-portability data next to the plot as
 ``<plot-prefix>_application_efficiency.csv`` and
 ``<plot-prefix>_performance_portability.csv``. The export keeps separate rows
 per size and precision *plus* averaged rows, and includes every available
-complexity metric when ``--complexity`` was supplied — useful when you want the
+complexity metric for ``p3analysis`` — useful when you want the
 underlying numbers rather than the figure.
 
 Python API

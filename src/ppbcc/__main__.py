@@ -24,8 +24,10 @@ def _run_command(name: str, argv: list[str]) -> int:
         from ppbcc.code_complexity.cli import main as command
     elif name == "profile":
         from ppbcc.profiling.cli import main as command
+    elif name == "p2analysis":
+        from ppbcc.performance_portability.cli import p2analysis_main as command
     else:
-        from ppbcc.performance_portability.cli import main as command
+        from ppbcc.performance_portability.cli import p3analysis_main as command
     return command(argv)
 
 
@@ -48,7 +50,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "command",
         nargs="?",
-        choices=("benchmark", "profile", "code-complexity", "p3analysis"),
+        choices=(
+            "benchmark",
+            "profile",
+            "code-complexity",
+            "p2analysis",
+            "p3analysis",
+        ),
         help="tool to run",
     )
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
@@ -69,34 +77,6 @@ def main(argv: list[str] | None = None) -> int:
         build_parser().print_help()
         return 0
     return _run_command(args.command, args.arguments)
-
-
-def code_complexity_main() -> int:
-    """Run the code-complexity compatibility executable."""
-    from ppbcc.code_complexity.cli import main as command
-
-    return command()
-
-
-def p3analysis_main() -> int:
-    """Run the P3-analysis compatibility executable."""
-    from ppbcc.performance_portability.cli import main as command
-
-    return command()
-
-
-def benchmark_main() -> int:
-    """Run the benchmark compatibility executable."""
-    from ppbcc.benchmark.cli import main as command
-
-    return command()
-
-
-def profile_main() -> int:
-    """Run the profiling compatibility executable."""
-    from ppbcc.profiling.cli import main as command
-
-    return command()
 
 
 if __name__ == "__main__":

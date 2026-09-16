@@ -25,7 +25,10 @@ from ppbcc.performance_portability.metrics import (
     calculate_export_metrics,
     calculate_metrics,
 )
-from ppbcc.performance_portability.options import build_parser
+from ppbcc.performance_portability.options import (
+    build_p2_parser,
+    build_p3_parser,
+)
 from ppbcc.performance_portability.selection import (
     ALL_SIZE,
     AVERAGE_OVER_EFFICIENCY,
@@ -91,39 +94,51 @@ def test_problem_selection_supports_unique_partial_name():
 
 def test_size_all_is_supported_and_is_the_default():
     assert parse_problem_size("ALL") == ALL_SIZE
-    args = build_parser().parse_args(["NBody", "results.csv"])
+    args = build_p2_parser().parse_args(["cascade", "results.csv"])
     assert args.size == ALL_SIZE
+    assert args.name is None
 
 
 @pytest.mark.parametrize("flag", ["-H", "--hardware"])
 def test_hardware_option_supports_short_and_long_flags(flag):
-    args = build_parser().parse_args(
-        ["NBody", "results.csv", "--chart", "boxplot", flag, "AMD MI250"]
+    args = build_p2_parser().parse_args(
+        ["boxplot", "results.csv", flag, "AMD MI250"]
     )
 
     assert args.hardware == "AMD MI250"
 
 
 def test_vertical_legend_option_is_parsed():
-    args = build_parser().parse_args(
-        ["NBody", "results.csv", "-l", "--legend--vertical"]
+    args = build_p2_parser().parse_args(
+        ["cascade", "results.csv", "-l", "--legend--vertical"]
     )
 
     assert args.legend is True
     assert args.legend_vertical is True
 
 
+def test_p3_parser_takes_complexity_csv_before_benchmark_csvs():
+    args = build_p3_parser().parse_args(
+        ["combined", "complexity.csv", "a.csv", "b.csv", "-n", "NBody"]
+    )
+
+    assert args.chart == "combined"
+    assert args.complexity.name == "complexity.csv"
+    assert [path.name for path in args.csv_files] == ["a.csv", "b.csv"]
+    assert args.name == "NBody"
+    assert args.complexity_metric == "halstead-difficulty"
+    assert args.complexity_absolute is False
+
+
 @pytest.mark.parametrize("literal", ["mean", "average", "best", "worst"])
 def test_boxplot_rejects_summary_size_literals(literal, tmp_path):
-    from ppbcc.performance_portability.cli import main
+    from ppbcc.performance_portability.cli import p2analysis_main
 
     assert (
-        main(
+        p2analysis_main(
             [
-                "NBody",
-                str(tmp_path / "unused.csv"),
-                "--chart",
                 "boxplot",
+                str(tmp_path / "unused.csv"),
                 "--size",
                 literal,
             ]
@@ -193,10 +208,10 @@ def test_export_average_row_follows_average_over(average_over, expected):
 
 
 def test_average_over_efficiency_requires_size_average(tmp_path):
-    from ppbcc.performance_portability.cli import main
+    from ppbcc.performance_portability.cli import p2analysis_main
 
-    arguments = ["NBody", str(tmp_path / "unused.csv"), "--average-over"]
-    assert main([*arguments, AVERAGE_OVER_EFFICIENCY]) == 1
+    arguments = ["cascade", str(tmp_path / "unused.csv"), "--average-over"]
+    assert p2analysis_main([*arguments, AVERAGE_OVER_EFFICIENCY]) == 1
 
 
 def _complexity_csv(tmp_path):
@@ -224,7 +239,7 @@ def test_baseline_reports_the_unscaled_cpp_value(tmp_path):
 def test_baseline_matches_the_hundred_percent_of_normalized_data(tmp_path):
     path = _complexity_csv(tmp_path)
     normalized, label = load_complexity_data(
-        path, "VecAdd", "sloc", normalize=True, additive=False
+        path, "VecAdd", "sloc", normalize=True
     )
     baseline = load_complexity_baseline(path, "VecAdd", "sloc")
     cpp = normalized.loc[normalized["Framework"] == "CPP", label]

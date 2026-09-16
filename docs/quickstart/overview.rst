@@ -29,7 +29,9 @@ The three workflows
 +-----------------------------+---------------------------------------------------------------+-------------------+
 | ``ppbcc benchmark``         | Run Google Benchmark targets, consolidate JSON into one CSV   | yes               |
 +-----------------------------+---------------------------------------------------------------+-------------------+
-| ``ppbcc p3analysis``        | Application efficiency, performance portability, five charts  | yes (CSV input)   |
+| ``ppbcc p2analysis``        | Application efficiency, performance portability, three charts | yes (CSV input)   |
++-----------------------------+---------------------------------------------------------------+-------------------+
+| ``ppbcc p3analysis``        | Performance portability against code complexity, three charts | yes (CSV input)   |
 +-----------------------------+---------------------------------------------------------------+-------------------+
 
 The data flow
@@ -41,7 +43,8 @@ The data flow
                                                                       │
     build/ (Google Benchmark) ──► ppbcc benchmark ──► Results_*.csv ──┴─► ppbcc p3analysis ──► plots + exports
 
-The two CSV products are joined by ``ppbcc p3analysis``: benchmark rows supply
+The two CSV products are joined by ``ppbcc p3analysis``; ``ppbcc p2analysis``
+needs the benchmark CSVs only. Benchmark rows supply
 application efficiency and performance portability, and the code-complexity
 rows supply the complexity axis of the Navchart and combined charts.
 
