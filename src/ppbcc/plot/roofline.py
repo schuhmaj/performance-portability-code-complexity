@@ -8,22 +8,24 @@ import pandas as pd
 from matplotlib.ticker import EngFormatter
 
 from ppbcc.constants import (
-    AGGREGATED_KERNEL,
     ARITHMETIC_INTENSITY,
-    KERNEL,
     MEMORY_LEVEL,
     PARADIGM,
     PEAK_BANDWIDTH,
     PEAK_PERFORMANCE,
     PERFORMANCE,
     PRECISION,
-    REGION,
 )
 from ppbcc.plot.styles import (
     SCATTER_MARKER_AREA,
     _application_legend_handles,
     _framework_colors,
+    font_points,
 )
+
+#: Factor applied to every font of the roofline chart; Matplotlib's defaults read
+#: too small once the figure is scaled down to a column in a paper.
+FONT_SCALE = 1.2
 
 
 def _ceilings(data: pd.DataFrame) -> tuple[float, float]:
@@ -54,7 +56,6 @@ def plot_roofline(
     data: pd.DataFrame,
     hardware: str = "",
     problem_title: str = "",
-    label_points: bool = False,
     show_legend: bool = True,
     subtitle: str = "",
 ) -> plt.Figure:
@@ -70,9 +71,6 @@ def plot_roofline(
             :func:`~ppbcc.profiling.reports.aggregate_kernels`.
         hardware: Hardware label used in the title.
         problem_title: Benchmark problem name used in the title.
-        label_points: Whether every point is annotated with its paradigm. The
-            legend already carries that information, so this is only useful when
-            the points are far enough apart.
         show_legend: Whether a paradigm legend is embedded in the plot.
         subtitle: Optional second title line, e.g. how kernels were aggregated.
 
@@ -96,6 +94,7 @@ def plot_roofline(
 
     paradigms = list(dict.fromkeys(finite[PARADIGM].astype(str)))
     colors = _framework_colors(paradigms)
+    small = font_points("legend.fontsize", FONT_SCALE)
 
     figure, axis = plt.subplots(figsize=(10.0, 7.0))
 
@@ -116,16 +115,16 @@ def plot_roofline(
         xytext=(-6, 8),
         textcoords="offset points",
         ha="right",
-        fontsize="small",
+        fontsize=small,
     )
     axis.annotate(
         f"{peak_bandwidth / 1e9:.0f} GB/s ({level})",
-        xy=(low * 2.0, peak_bandwidth * low * 2.0),
+        xy=(low * 1.15, peak_bandwidth * low * 1.15),
         xytext=(6, -14),
         textcoords="offset points",
         rotation=38,
         rotation_mode="anchor",
-        fontsize="small",
+        fontsize=small,
     )
 
     for _, row in finite.iterrows():
@@ -142,32 +141,28 @@ def plot_roofline(
             alpha=0.85,
             zorder=3,
         )
-        if label_points:
-            # The paradigm alone is ambiguous whenever one implementation
-            # contributes more than one point: the polyhedral binaries have an
-            # "init" and an "evaluate" region, and the CUDA matrix
-            # multiplication links cuBLAS next to its own kernel.
-            label = str(row[PARADIGM])
-            region = str(row.get(REGION, "") or "")
-            if region:
-                label = f"{label}: {region}"
-            elif row.get(KERNEL, AGGREGATED_KERNEL) != AGGREGATED_KERNEL:
-                label = f"{label}: {row[KERNEL]}"
-            axis.annotate(
-                label,
-                xy=(row[ARITHMETIC_INTENSITY], row[PERFORMANCE]),
-                xytext=(7, 5),
-                textcoords="offset points",
-                fontsize="x-small",
-            )
 
     axis.set_xscale("log")
     axis.set_yscale("log")
-    axis.set_xlabel(f"Arithmetic Intensity [FLOP / {level} byte]")
-    axis.set_ylabel("Performance [FLOP/s]")
-    axis.yaxis.set_major_formatter(EngFormatter(unit="FLOP/s", places=0))
+    label_size = font_points("axes.labelsize", FONT_SCALE)
+    axis.set_xlabel(f"Arithmetic Intensity [FLOP / {level} byte]", fontsize=label_size)
+    axis.set_ylabel("Performance [FLOP/s]", fontsize=label_size)
+    # The unit is in the axis label already; without it the vertical tick labels
+    # stay short enough not to run into the titles.
+    axis.yaxis.set_major_formatter(EngFormatter(places=0))
+    axis.tick_params(axis="x", labelsize=font_points("xtick.labelsize", FONT_SCALE))
+    # Horizontal y tick labels are the widest element of the chart, so they run
+    # along the axis instead.
+    axis.tick_params(
+        axis="y",
+        labelsize=font_points("ytick.labelsize", FONT_SCALE),
+        labelrotation=90,
+    )
     axis.set_xlim(low, high)
     axis.set_ylim(finite[PERFORMANCE].min() / 4.0, peak_flops * 2.0)
+    # The tick labels exist only once the limits are final.
+    for label in axis.get_yticklabels():
+        label.set_verticalalignment("center")
     axis.grid(True, which="both", linestyle="--", alpha=0.35)
 
     # The ridge point separates the memory- from the compute-bound regime.
@@ -178,21 +173,29 @@ def plot_roofline(
         xytext=(-6, 6),
         textcoords="offset points",
         ha="right",
-        fontsize="small",
+        fontsize=small,
         alpha=0.7,
     )
 
     title = " ".join(filter(None, [problem_title, "Roofline"]))
-    figure.suptitle(f"{title} - {hardware}" if hardware else title)
+    title_artist = figure.suptitle(
+        f"{title} - {hardware}" if hardware else title,
+        fontsize=font_points("figure.titlesize", FONT_SCALE),
+    )
     if subtitle:
-        axis.set_title(subtitle, fontsize="small", color="0.35")
+        axis.set_title(subtitle, fontsize=small, color="0.35")
     if show_legend:
         axis.legend(
             handles=_application_legend_handles(paradigms, colors, False),
             title="Paradigm",
             loc="lower right",
             frameon=True,
-            fontsize="small",
+            fontsize=small,
+            title_fontsize=small,
         )
     figure.tight_layout()
+    # The subtitle is centred on the axes, the figure title on the whole figure,
+    # which the y-axis label pushes off centre; align the title with the axes.
+    position = axis.get_position()
+    title_artist.set_x((position.x0 + position.x1) / 2.0)
     return figure

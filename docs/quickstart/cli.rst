@@ -129,6 +129,8 @@ one row per kernel launch) or ``likwid`` (one row per marked region, needs
      - ``sum`` (default), ``dominant``, or ``none`` — how launches become plot points
    * - ``--roofline [PATH]``
      - Render the roofline chart, optionally to a given path
+   * - ``-l, --no-legend``
+     - Leave the paradigm legend out of the roofline chart
    * - ``--no-csv``
      - Skip the consolidated CSV (for a pure collection run)
    * - ``--peak-performance`` / ``--peak-bandwidth``

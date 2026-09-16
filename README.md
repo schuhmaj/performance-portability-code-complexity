@@ -134,6 +134,7 @@ Runs Google Benchmark targets and consolidates their JSON reports into one CSV.
 | `--all-kernels` | Keep the launches outside every named region (dropped by default) |
 | `-a, --aggregate` | `sum` (default), `dominant`, or `none` — how launches become plot points |
 | `--roofline [PATH]` | Render the roofline chart, optionally to a given path |
+| `-l, --no-legend` | Leave the paradigm legend out of the roofline chart |
 | `--no-csv` | Skip the consolidated CSV (for a pure collection run) |
 | `--peak-performance` / `--peak-bandwidth` | Roofline ceilings for the backends without `peak_sustained` counters; `--peak-bandwidth` also converts the sampled percentages to bytes |
 | `--analytic-flop` | `REGEX=FLOP` work model for `nsys`/`ngfx`, whose metric sets carry pipe utilisations rather than instruction counts |

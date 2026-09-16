@@ -370,6 +370,23 @@ def test_plot_roofline_draws_a_point_per_row():
     assert axis.get_xscale() == "log" and axis.get_yscale() == "log"
 
 
+def test_plot_roofline_leaves_points_unlabelled_and_centres_the_titles():
+    figure = plot_roofline(
+        aggregate_kernels(_points(), "none").iloc[1:],
+        hardware="NVIDIA RTX5080",
+        problem_title="Polyhedral",
+        subtitle="one point per kernel launch",
+        show_legend=False,
+    )
+    axis = figure.axes[0]
+    assert axis.get_legend() is None
+    # Only the two ceiling annotations and the ridge point remain, no per-point label.
+    assert len(axis.texts) == 3
+    position = axis.get_position()
+    assert figure._suptitle.get_position()[0] == pytest.approx((position.x0 + position.x1) / 2.0)
+    assert all(label.get_rotation() == 90 for label in axis.get_yticklabels())
+
+
 def test_plot_roofline_rejects_data_without_a_usable_point():
     empty = _points().iloc[:1]
     with pytest.raises(ValueError):
@@ -385,6 +402,11 @@ def test_profile_cli_parses_the_analysis_defaults():
     assert args.memory_level == "dram"
     # --regex is only required without --from-csv, which selects rows instead.
     assert build_parser().parse_args(["--from-csv", "a.csv"]).regex == []
+
+
+def test_profile_cli_no_legend_flag():
+    assert build_parser().parse_args(["-r", "x", "-l"]).no_legend
+    assert not build_parser().parse_args(["-r", "x"]).no_legend
 
 
 def test_profile_cli_roofline_takes_an_optional_path():

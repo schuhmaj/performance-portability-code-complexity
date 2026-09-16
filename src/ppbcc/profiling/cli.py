@@ -460,10 +460,10 @@ def build_parser() -> argparse.ArgumentParser:
         "(default: '<problem>_roofline.pdf').",
     )
     output.add_argument(
-        "--label-points",
+        "-l",
+        "--no-legend",
         action="store_true",
-        help="Annotate every roofline point with its paradigm. Off by default: "
-        "the legend already carries that, and the points tend to cluster.",
+        help="Leave the paradigm legend out of the roofline chart.",
     )
     output.add_argument(
         "-v",
@@ -783,7 +783,7 @@ def _write_and_plot(args: argparse.Namespace, data) -> int:
             points,
             hardware=args.hardware,
             problem_title=problem_title,
-            label_points=args.label_points,
+            show_legend=not args.no_legend,
             # A row means something different per backend: ncu reports kernel
             # launches, LIKWID the regions marked in the source.
             subtitle={
