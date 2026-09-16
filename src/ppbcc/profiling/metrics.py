@@ -97,6 +97,59 @@ MEMORY_LEVEL_CLOCK = {
 }
 
 
+# --------------------------------------------------------------------------- #
+# Units
+# --------------------------------------------------------------------------- #
+
+#: Units of the derived roofline columns, as written into the CSV header.
+DERIVED_UNITS = {
+    "Grid Size": "blocks",
+    "Block Size": "threads/block",
+    "Duration": "s",
+    "FLOP": "FLOP",
+    "FLOP FP32": "FLOP",
+    "FLOP FP64": "FLOP",
+    "FLOP FP16": "FLOP",
+    "Memory Traffic": "Byte",
+    "Arithmetic Intensity": "FLOP/Byte",
+    "Performance": "FLOP/s",
+    "Peak Performance": "FLOP/s",
+    "Peak Bandwidth": "Byte/s",
+}
+
+
+def column_unit(column: str) -> str | None:
+    """Return the unit of a profiling column.
+
+    Raw metrics follow Nsight Compute's naming scheme, from which their unit
+    follows (checked against ``IMetric.unit()`` of the reports): ``.sum`` of
+    bytes or instructions is a count, ``.peak_sustained`` the same per clock
+    cycle, ``.per_second`` a clock rate, ``pct_of_*`` a percentage.
+
+    Args:
+        column: Column name without a unit.
+
+    Returns:
+        The unit, or ``None`` for identifying and textual columns.
+    """
+    if column in DERIVED_UNITS:
+        return DERIVED_UNITS[column]
+    if "__" not in column:
+        return None
+    if column == "gpu__time_duration.sum":
+        return "ns"
+    if "pct_of_peak" in column:
+        return "%"
+    if column.endswith(".per_second"):
+        return "cycle/s"
+    if column.startswith("launch__"):
+        return {"launch__grid_size": "blocks", "launch__block_size": "threads/block"}.get(
+            column, "1"
+        )
+    quantity = "Byte" if "bytes" in column else "inst" if "inst" in column else "cycle"
+    return f"{quantity}/cycle" if column.endswith(".peak_sustained") else quantity
+
+
 def flop_columns(precision: str) -> tuple[str, str, str]:
     """Return the add/mul/fma metric names of one precision.
 

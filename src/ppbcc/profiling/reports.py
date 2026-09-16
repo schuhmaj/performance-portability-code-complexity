@@ -6,6 +6,7 @@ import io
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -38,6 +39,8 @@ from ppbcc.profiling.metrics import (
     MEMORY_LEVEL_CLOCK,
     MEMORY_LEVELS,
     PRECISIONS,
+    ROOFLINE_METRICS,
+    column_unit,
     flop_columns,
     peak_flop_column,
 )
@@ -142,6 +145,107 @@ def _import_csv(report: Path, ncu: str) -> pd.DataFrame:
     if start < 0:
         return pd.DataFrame()
     return pd.read_csv(io.StringIO(output[start:]), dtype=str)
+
+
+#: Places the ``ncu_report`` Python module ships in, tried in order when it is not
+#: importable already. On macOS the host application carries it; on Linux the
+#: ``extras/python`` folder of every installed Nsight Compute version does.
+_NCU_REPORT_LOCATIONS = [
+    Path("/Applications/NVIDIA Nsight Compute.app/Contents/MacOS/python"),
+    *sorted(Path("/opt/nvidia/nsight-compute").glob("*/extras/python"), reverse=True),
+]
+
+
+def _ncu_report_module():
+    """Import Nsight Compute's ``ncu_report`` module.
+
+    Returns:
+        The imported module.
+
+    Raises:
+        ImportError: If neither the Python path nor a known installation
+            provides it.
+    """
+    try:
+        import ncu_report  # type: ignore[import-not-found]
+
+        return ncu_report
+    except ImportError:
+        pass
+    for location in _NCU_REPORT_LOCATIONS:
+        if (location / "ncu_report.py").is_file():
+            sys.path.append(str(location))
+            import ncu_report  # type: ignore[import-not-found]
+
+            logger.debug(f"Using ncu_report from {location}")
+            return ncu_report
+    raise ImportError(
+        "Neither the Nsight Compute CLI nor its 'ncu_report' Python module is "
+        "available. Install Nsight Compute or add its python folder to PYTHONPATH."
+    )
+
+
+def _import_api(report: Path, metrics: list[str]) -> pd.DataFrame:
+    """Read one profiler report through Nsight Compute's Python API.
+
+    This is the route on a host without the ``ncu`` CLI, e.g. the macOS
+    application, which ships only the Linux CLI but the report reader for the
+    host itself. The values are the ones the CLI prints, at full precision
+    rather than rounded to two decimals. Kernel names are the demangled ones;
+    the CLI additionally shortens some namespaces (``Kokkos::Impl::`` becomes
+    ``Kokkos::``), which the API does not expose.
+
+    Args:
+        report: Path to a ``.ncu-rep`` file.
+        metrics: Metric names to read; missing ones are skipped.
+
+    Returns:
+        One row per kernel launch with the columns :func:`_pivot` produces,
+        except that the region is already resolved into :data:`REGION`.
+    """
+    ncu_report = _ncu_report_module()
+    context = ncu_report.load_report(report)
+    rows: list[dict[str, object]] = []
+    for range_index in range(context.num_ranges()):
+        for launch_id, action in enumerate(context.range_by_idx(range_index)):
+            available = set(action.metric_names())
+
+            def dims(prefix: str) -> str:
+                values = [
+                    action.metric_by_name(f"{prefix}_dim_{axis}").value()
+                    if f"{prefix}_dim_{axis}" in available
+                    else 1
+                    for axis in "xyz"
+                ]
+                return f"({values[0]}, {values[1]}, {values[2]})"
+
+            state = action.nvtx_state()
+            region = ""
+            for domain in state.domains():
+                info = state.domain_by_id(domain)
+                if info.name() != _NVTX_DOMAIN:
+                    continue
+                names = [
+                    info.push_pop_range(index).name()
+                    for index in range(len(info.push_pop_ranges()))
+                ]
+                region = next((name for name in reversed(names) if name), "")
+            row: dict[str, object] = {
+                "ID": launch_id,
+                "Kernel Name": action.name(action.NameBase_DEMANGLED),
+                BLOCK_SIZE: dims("launch__block"),
+                GRID_SIZE: dims("launch__grid"),
+                REGION: region,
+            }
+            for metric in metrics:
+                if metric in available:
+                    value = action.metric_by_name(metric).value()
+                    row[metric] = float(value) if value is not None else float("nan")
+            rows.append(row)
+    frame = pd.DataFrame(rows)
+    # Same column order as the pivoted CLI export: keys first, metrics sorted.
+    keys = ["ID", "Kernel Name", BLOCK_SIZE, GRID_SIZE, REGION]
+    return frame[[*keys, *sorted(c for c in frame if c not in keys)]] if rows else frame
 
 
 def _pivot(long_table: pd.DataFrame) -> pd.DataFrame:
@@ -282,7 +386,7 @@ def _derive(frame: pd.DataFrame, precision: str, memory_level: str) -> pd.DataFr
 
 def load_reports(
     reports: list[Path],
-    ncu: str = "ncu",
+    ncu: str | None = "ncu",
     hardware: str = "",
     precision: str = "auto",
     memory_level: str = "dram",
@@ -291,7 +395,9 @@ def load_reports(
 
     Args:
         reports: Paths to ``.ncu-rep`` files.
-        ncu: Profiler executable used to re-import the reports.
+        ncu: Profiler executable used to re-import the reports, or ``None`` to
+            read them through Nsight Compute's ``ncu_report`` Python module
+            instead (a host without the CLI, such as macOS).
         hardware: Free-form hardware identifier stored in the ``Hardware``
             column (e.g. ``"NVIDIA RTX5080"``).
         precision: ``auto`` to follow the precision the binary was built with,
@@ -309,11 +415,15 @@ def load_reports(
     logger.info(f"Loading {len(reports)} profiler report(s)")
     for report in reports:
         try:
-            long_table = _import_csv(report, ncu)
+            if ncu is None:
+                frame = _import_api(report, ROOFLINE_METRICS)
+            else:
+                long_table = _import_csv(report, ncu)
+                frame = pd.DataFrame() if long_table.empty else _pivot(long_table)
         except subprocess.CalledProcessError as error:
             logger.error(f"Could not import {report}: {error}")
             continue
-        if long_table.empty:
+        if frame.empty:
             logger.warning(
                 f"{report.name} contains no profiled kernels — the paradigm most "
                 "likely does not run on CUDA (Nsight Compute sees no OpenCL, "
@@ -321,7 +431,6 @@ def load_reports(
             )
             continue
 
-        frame = _pivot(long_table)
         # ncu appends its own suffix, so the stem is the executable's name.
         executable = report.name[: -len(".ncu-rep")]
         paradigm, float_type, problem = _load_context(
@@ -338,7 +447,8 @@ def load_reports(
         # The NVTX column is only there when the report was collected with
         # --nvtx against a binary built with PPB_ENABLE_NVTX.
         nvtx = [column for column in frame if _NVTX_COLUMN_MARKER in column]
-        frame[REGION] = frame[nvtx[0]].map(_nvtx_region) if nvtx else ""
+        if REGION not in frame:
+            frame[REGION] = frame[nvtx[0]].map(_nvtx_region) if nvtx else ""
         # "Block Size"/"Grid Size" already carry their final names.
         frame = frame.drop(columns=["ID", "Kernel Name", *nvtx])
 
@@ -362,6 +472,40 @@ def load_reports(
     return combined
 
 
+#: A unit appended to a CSV header, e.g. ``Arithmetic Intensity [FLOP/Byte]``.
+_UNIT_SUFFIX = re.compile(r"\s+\[[^\[\]]*\]$")
+
+
+def with_units(frame: pd.DataFrame) -> pd.DataFrame:
+    """Append the unit to every column that has one, for writing the CSV.
+
+    Args:
+        frame: A profiling table with bare column names.
+
+    Returns:
+        A copy whose headers read ``<name> [<unit>]``.
+    """
+    return frame.rename(
+        columns={
+            column: f"{column} [{unit}]"
+            for column in frame
+            if (unit := column_unit(str(column))) is not None
+        }
+    )
+
+
+def without_units(frame: pd.DataFrame) -> pd.DataFrame:
+    """Strip the units :func:`with_units` appended, for reading a CSV back.
+
+    Args:
+        frame: A profiling table read from a CSV, with or without units.
+
+    Returns:
+        The table with bare column names.
+    """
+    return frame.rename(columns=lambda column: _UNIT_SUFFIX.sub("", str(column)))
+
+
 def load_csv(paths: list[Path]) -> pd.DataFrame:
     """Concatenate consolidated profiling CSVs into one table.
 
@@ -380,7 +524,7 @@ def load_csv(paths: list[Path]) -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
     for path in paths:
         try:
-            frame = pd.read_csv(path)
+            frame = without_units(pd.read_csv(path))
         except (OSError, ValueError) as error:
             logger.error(f"Could not read {path}: {error}")
             continue

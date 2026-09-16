@@ -33,6 +33,7 @@ from ppbcc.profiling import likwid, ngfx, nsys  # noqa: E402
 from ppbcc.profiling.cli import build_parser, parse_options  # noqa: E402
 from ppbcc.profiling.metrics import (  # noqa: E402
     ROOFLINE_METRICS,
+    column_unit,
     flop_columns,
     peak_flop_column,
 )
@@ -43,6 +44,8 @@ from ppbcc.profiling.reports import (  # noqa: E402
     filter_regions,
     load_reports,
     select_regions,
+    with_units,
+    without_units,
 )
 from ppbcc.profiling.runner import aslr_prefix, profile_command  # noqa: E402
 
@@ -57,6 +60,39 @@ def test_flop_and_peak_columns_are_part_of_the_collected_metrics():
         for column in flop_columns(precision):
             assert column in ROOFLINE_METRICS
         assert peak_flop_column(precision) in ROOFLINE_METRICS
+
+
+@pytest.mark.parametrize(
+    "column, unit",
+    [
+        ("Arithmetic Intensity", "FLOP/Byte"),
+        ("Peak Bandwidth", "Byte/s"),
+        ("gpu__time_duration.sum", "ns"),
+        ("dram__bytes.sum", "Byte"),
+        ("dram__bytes.sum.peak_sustained", "Byte/cycle"),
+        ("sm__sass_thread_inst_executed_op_ffma_pred_on.sum.peak_sustained", "inst/cycle"),
+        ("sm__cycles_elapsed.avg", "cycle"),
+        ("lts__cycles_elapsed.avg.per_second", "cycle/s"),
+        ("gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed", "%"),
+        ("Executable", None),
+    ],
+)
+def test_column_unit_follows_the_metric_name(column, unit):
+    assert column_unit(column) == unit
+
+
+def test_every_collected_metric_has_a_unit():
+    assert all(column_unit(metric) for metric in ROOFLINE_METRICS)
+
+
+def test_units_round_trip_through_the_csv_header():
+    frame = pd.DataFrame(columns=["Executable", "FLOP", "FLOP FP32", *ROOFLINE_METRICS])
+    annotated = with_units(frame)
+    assert "Arithmetic Intensity [FLOP/Byte]" in with_units(
+        pd.DataFrame(columns=["Arithmetic Intensity"])
+    )
+    assert "Executable" in annotated
+    assert list(without_units(annotated).columns) == list(frame.columns)
 
 
 # --------------------------------------------------------------------------- #

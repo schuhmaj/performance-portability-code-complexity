@@ -279,6 +279,13 @@ The CSV holds one row per profiled kernel launch: the identifying columns
 size),
 the derived roofline quantities (duration, FLOP, traffic, arithmetic intensity,
 performance, and both ceilings), and behind them every raw ``ncu`` metric.
+Every quantity carries its unit in the header, e.g. ``Arithmetic Intensity
+[FLOP/Byte]`` or ``dram__bytes.sum.peak_sustained [Byte/cycle]``; ``--from-csv``
+reads files with and without units.
+
+``--skip-profile`` does not need the ``ncu`` CLI: without one on the ``PATH``,
+the reports are read through Nsight Compute's ``ncu_report`` Python module,
+which the macOS host application ships as well.
 
 The roofline chart uses the same paradigm colors as :doc:`p3analysis`, so a
 point can be matched to its paradigm across both figures.

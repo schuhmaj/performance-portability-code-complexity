@@ -39,6 +39,7 @@ from ppbcc.profiling.reports import (
     load_csv,
     load_reports,
     select_regions,
+    with_units,
 )
 from ppbcc.profiling.runner import REPORT_SUFFIX, find_ncu, run_profiles
 from ppbcc.profiling import likwid as likwid_backend
@@ -714,9 +715,16 @@ def main(argv: list[str] | None = None) -> int:
         if not reports:
             logger.error("No profiler reports available to process.")
             return 1
+        if not tool:
+            try:
+                tool = find_ncu(args.profiler_path)
+            except FileNotFoundError:
+                # Re-reading needs no CLI: the reports open through Nsight
+                # Compute's Python module, which the macOS host ships as well.
+                logger.info("No ncu CLI found; reading the reports with ncu_report")
         data = load_reports(
             reports,
-            ncu=tool or find_ncu(args.profiler_path),
+            ncu=tool or None,
             hardware=args.hardware,
             precision=args.precision,
             memory_level=args.memory_level,
@@ -748,7 +756,7 @@ def _write_and_plot(args: argparse.Namespace, data) -> int:
         csv_path = args.output.with_suffix(".csv")
         try:
             csv_path.parent.mkdir(parents=True, exist_ok=True)
-            data.to_csv(csv_path, index=False)
+            with_units(data).to_csv(csv_path, index=False)
         except OSError as error:
             logger.error(f"Could not write {csv_path}: {error}")
             return 1
