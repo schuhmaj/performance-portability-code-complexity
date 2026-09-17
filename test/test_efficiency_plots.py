@@ -10,7 +10,9 @@ from matplotlib.colors import to_rgba
 
 from ppbcc.constants import APPLICATION, APPLICATION_EFFICIENCY, HARDWARE
 from ppbcc.plot.heatmap import (
+    MISSING_LABEL,
     plot_efficiency_boxplot,
+    plot_efficiency_double_heatmap,
     plot_efficiency_heatmap,
 )
 from ppbcc.plot.styles import _framework_colors
@@ -47,6 +49,78 @@ def test_heatmap_uses_paradigms_as_columns_and_platforms_as_rows():
     assert len(axis.texts) == 4
     assert figure.axes[1].get_ylabel() == "Application Efficiency"
     plt.close(figure)
+
+
+def test_heatmap_marks_never_benchmarked_cells_instead_of_zero():
+    efficiency = _efficiency_frame()
+    efficiency.loc[3, APPLICATION_EFFICIENCY] = 0.0
+    figure = plot_efficiency_heatmap(efficiency, "NBody")
+    axis = figure.axes[0]
+    labels = [text.get_text() for text in axis.texts]
+
+    assert labels.count(MISSING_LABEL) == 1
+    assert "0.00" not in labels
+    assert len(labels) == 4
+    assert any(
+        to_rgba(patch.get_facecolor()) == to_rgba("black") for patch in axis.patches
+    )
+    plt.close(figure)
+
+
+def test_double_heatmap_splits_every_cell_into_two_sizes():
+    first = _efficiency_frame()
+    second = _efficiency_frame()
+    second.loc[0, APPLICATION_EFFICIENCY] = 0.0
+    figure = plot_efficiency_double_heatmap(
+        first, second, "NBody", 100.0, 3145728.0, remove_description=True
+    )
+    axis = figure.axes[0]
+    labels = [text.get_text() for text in axis.texts]
+
+    assert len(axis.patches) == 8
+    assert len(labels) == 8
+    assert labels.count(MISSING_LABEL) == 1
+    # The missing Cuda result pulls its mean over both sizes below Kokkos'.
+    assert [label.get_text() for label in axis.get_xticklabels()] == [
+        "Kokkos",
+        "Cuda",
+    ]
+    assert [label.get_text() for label in axis.get_yticklabels()] == [
+        "AMD MI250",
+        "NVIDIA H100",
+    ]
+    assert "100" in axis.get_title() and "3145728" in axis.get_title()
+    plt.close(figure)
+
+
+def test_heatmaps_sort_paradigms_alphabetically_on_request():
+    efficiency = pd.DataFrame(
+        [
+            ["raja", "AMD MI250", 1.0],
+            ["Kokkos", "AMD MI250", 0.2],
+            ["Cuda", "AMD MI250", 0.5],
+        ],
+        columns=[APPLICATION, HARDWARE, APPLICATION_EFFICIENCY],
+    )
+    expected = ["Cuda", "Kokkos", "raja"]
+
+    single = plot_efficiency_heatmap(efficiency, "NBody", sort_alphabetically=True)
+    double = plot_efficiency_double_heatmap(
+        efficiency, efficiency, "NBody", 100.0, 200.0, sort_alphabetically=True
+    )
+    default = plot_efficiency_heatmap(efficiency, "NBody")
+
+    for figure in (single, double):
+        assert [
+            label.get_text() for label in figure.axes[0].get_xticklabels()
+        ] == expected
+    assert [label.get_text() for label in default.axes[0].get_xticklabels()] == [
+        "raja",
+        "Cuda",
+        "Kokkos",
+    ]
+    for figure in (single, double, default):
+        plt.close(figure)
 
 
 def test_boxplot_sorts_paradigms_and_uses_framework_colors():

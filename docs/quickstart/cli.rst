@@ -161,7 +161,7 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
    * - Option
      - Meaning
    * - ``PLOT``
-     - ``p2analysis``: ``cascade``, ``heatmap``, ``boxplot``, ``time-barplot``;
+     - ``p2analysis``: ``cascade``, ``heatmap``, ``double-heatmap``, ``boxplot``, ``time-barplot``;
        ``p3analysis``: ``navchart``, ``combined``, ``complexity-comparison``
    * - ``COMPLEXITY_CSV``
      - ``p3analysis`` only: code-complexity CSV with one row per implementation

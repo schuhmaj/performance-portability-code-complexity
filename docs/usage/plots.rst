@@ -48,6 +48,8 @@ Chart overview
 +---------------------------+-------------------------------------------------+-------------------+
 | ``heatmap``               | Efficiency per paradigm and platform            | ``p2analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
+| ``double-heatmap``        | Efficiency at two sizes, one split cell each    | ``p2analysis``    |
++---------------------------+-------------------------------------------------+-------------------+
 | ``boxplot``               | Efficiency distribution per paradigm            | ``p2analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
 | ``time-barplot``          | Runtime per paradigm, grouped by platform       | ``p2analysis``    |
@@ -131,9 +133,9 @@ two lower panels line up row for row.
 
 Column labels become exponents whenever every size is an exact power of one
 base — :math:`2^5 \ldots 2^{14}`, :math:`10^1 \ldots 10^8` — which is short
-enough to carry the same font size as the cell values. A sweep that is not a
-clean power sequence keeps decimal labels at a smaller size, since upright
-labels that long would grow the figure's bounding box.
+enough to sit horizontally within one column at a size slightly above the cell
+values. A sweep that is not a clean power sequence keeps upright decimal labels
+at a smaller size, since labels that long would grow the figure's bounding box.
 
 Complexity comparison
 ---------------------
@@ -179,10 +181,13 @@ Efficiency heatmap
 ------------------
 
 The heatmap trades the ranking abstraction for raw numbers: one cell per
-paradigm and platform, annotated with the application efficiency. Zero cells
-are exactly the platforms an implementation does not support — which is what
-drives :math:`\Phi` to zero without ``--non-zero-pp``. The color scale is fixed
-to :math:`[0, 1]`, so heatmaps of different problems remain comparable.
+paradigm and platform, annotated with the application efficiency. Platforms an
+implementation was never benchmarked on are drawn as black cells with a dash
+rather than as an efficiency of zero — they are what drives :math:`\Phi` to zero
+without ``--non-zero-pp``. The color scale is fixed to :math:`[0, 1]`, so
+heatmaps of different problems remain comparable.
+Paradigms are ordered by descending mean efficiency; ``--sort-alphabetically``
+orders them by name instead, which applies to ``double-heatmap`` as well.
 
 .. figure:: ../figures/matrixmultiplication_heatmap.svg
    :alt: Application-efficiency heatmap by paradigm and platform
@@ -195,6 +200,21 @@ to :math:`[0, 1]`, so heatmaps of different problems remain comparable.
 
     ppbcc p2analysis heatmap ./Results_* -n MatrixMultiplication \
       --non-zero-pp --remove-description -s 16384 -x "Cublas"
+
+Double efficiency heatmap
+-------------------------
+
+``double-heatmap`` compares two problem sizes in one figure. Every cell is split
+along its diagonal: the upper-left triangle shows the size given with ``-s``,
+the lower-right triangle the size given with ``--second-size``. Both sizes must
+be exact numeric sizes, and both halves share the fixed :math:`[0, 1]` color
+scale. A half whose paradigm was never benchmarked on the platform at that size
+is black with a dash.
+
+.. code-block:: bash
+
+    ppbcc p2analysis double-heatmap ./Results_* -n MatrixMultiplication \
+      --remove-description -s 1024 --second-size 16384 -x "Cublas"
 
 Efficiency boxplot
 ------------------

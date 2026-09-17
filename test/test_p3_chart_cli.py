@@ -100,6 +100,7 @@ def test_heatmap_honors_size_regex_and_remove_description(tmp_path, monkeypatch)
 
     assert result == 0
     assert captured["selected_size"] == 100.0
+    assert captured["sort_alphabetically"] is False
     assert captured["remove_description"] is True
     assert captured["output"].name == "nbody_heatmap.pdf"
     assert set(captured["efficiency"][APPLICATION]) == {
@@ -111,6 +112,92 @@ def test_heatmap_honors_size_regex_and_remove_description(tmp_path, monkeypatch)
         APPLICATION_EFFICIENCY,
     ]
     assert set(kokkos) == {0.5}
+
+
+def test_double_heatmap_passes_efficiency_at_both_sizes(tmp_path, monkeypatch):
+    csv_path = tmp_path / "benchmarks.csv"
+    _write_benchmarks(csv_path)
+    captured = {}
+
+    def fake_double_heatmap(first, second, problem_title, **kwargs):
+        captured["first"] = first.copy()
+        captured["second"] = second.copy()
+        captured.update(kwargs)
+        return plt.figure()
+
+    monkeypatch.setattr(cli, "plot_efficiency_double_heatmap", fake_double_heatmap)
+
+    def fake_save(figure, output):
+        captured["output"] = output
+        plt.close(figure)
+
+    monkeypatch.setattr(cli, "save_figure", fake_save)
+
+    result = cli.p2analysis_main(
+        [
+            "double-heatmap",
+            str(csv_path),
+            "-s",
+            "100",
+            "--second-size",
+            "200",
+            "-x",
+            "Cublas",
+            "--sort-alphabetically",
+        ]
+    )
+
+    assert result == 0
+    assert captured["sort_alphabetically"] is True
+    assert captured["first_size"] == 100.0
+    assert captured["second_size"] == 200.0
+    assert captured["output"].name == "nbody_double_heatmap.pdf"
+
+    def kokkos(frame):
+        return set(
+            frame.loc[
+                frame[APPLICATION].eq("Kokkos[Portable]"), APPLICATION_EFFICIENCY
+            ]
+        )
+
+    assert kokkos(captured["first"]) == {0.5}
+    assert kokkos(captured["second"]) == {0.25}
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["double-heatmap", "-s", "100"],
+        ["double-heatmap", "--second-size", "100"],
+        ["double-heatmap", "-s", "avg", "--second-size", "100"],
+        ["heatmap", "-s", "100", "--second-size", "200"],
+        ["boxplot", "--sort-alphabetically"],
+    ],
+)
+def test_double_heatmap_size_options_are_validated(arguments, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "load_benchmark_csvs",
+        lambda paths: pytest.fail("input should not be loaded"),
+    )
+
+    result = cli.p2analysis_main(
+        [arguments[0], str(tmp_path / "unused.csv"), *arguments[1:]]
+    )
+
+    assert result == 1
+
+
+def test_double_heatmap_rejects_unknown_second_size(tmp_path, monkeypatch):
+    csv_path = tmp_path / "benchmarks.csv"
+    _write_benchmarks(csv_path)
+    monkeypatch.setattr(cli, "save_figure", lambda figure, output: plt.close(figure))
+
+    result = cli.p2analysis_main(
+        ["double-heatmap", str(csv_path), "-s", "100", "--second-size", "300"]
+    )
+
+    assert result == 1
 
 
 def test_boxplot_all_retains_every_selected_size(tmp_path, monkeypatch):

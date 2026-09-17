@@ -14,7 +14,7 @@ from ppbcc.performance_portability.selection import (
 )
 
 #: Charts that need benchmark results only.
-P2_CHARTS = ("cascade", "heatmap", "boxplot", "time-barplot")
+P2_CHARTS = ("cascade", "heatmap", "double-heatmap", "boxplot", "time-barplot")
 #: Charts that combine benchmark results with code complexity.
 P3_CHARTS = ("navchart", "combined", "complexity-comparison")
 
@@ -153,7 +153,8 @@ def _add_shared_arguments(parser: argparse.ArgumentParser) -> None:
             "takes the minimum of each metric over problem sizes. Scaling "
             "still uses all sizes. Boxplots accept only 'all' or a numeric size; "
             "time-barplot accepts only a numeric size and uses the largest "
-            "size for 'all'."
+            "size for 'all'; double-heatmap requires a numeric size for its "
+            "upper-left triangles."
         ),
     )
     metrics.add_argument(
@@ -181,7 +182,8 @@ def _add_shared_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help=(
             "Calculate PP over supported platforms only. Missing platforms "
-            "remain zero in application-efficiency plots."
+            "remain zero in application-efficiency plots; the heatmaps mark "
+            "them as never benchmarked instead."
         ),
     )
 
@@ -205,6 +207,24 @@ def build_p2_parser() -> argparse.ArgumentParser:
         help=(
             "Only include results from this hardware in a boxplot or "
             "time-barplot."
+        ),
+    )
+    heatmap = parser.add_argument_group("heatmap and double-heatmap options")
+    heatmap.add_argument(
+        "--sort-alphabetically",
+        action="store_true",
+        help=(
+            "Order the paradigms on the x axis of a heatmap or double-heatmap "
+            "alphabetically instead of by descending mean efficiency."
+        ),
+    )
+    heatmap.add_argument(
+        "--second-size",
+        type=float,
+        metavar="SIZE",
+        help=(
+            "Exact problem size of the lower-right triangles of a "
+            "double-heatmap; -s/--size gives the upper-left one."
         ),
     )
     runtime = parser.add_argument_group("time-barplot options")

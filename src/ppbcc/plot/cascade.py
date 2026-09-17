@@ -185,13 +185,14 @@ def _draw_scaling_heatmap(
                 ),
             )
 
-    # Upright labels never collide horizontally however long they are, so the
-    # size that fits is set by the column pitch. Power notation is short enough
-    # to carry the same size as the cell values; decimal labels are longer and
-    # would grow the figure's bounding box, so they stay smaller.
+    # Power notation such as ``2^14`` is short enough to sit horizontally
+    # within one column, so it reads without tilting the head and carries a
+    # size slightly above the cell values. Decimal labels are longer: set
+    # upright they never collide, and they stay smaller so they do not grow
+    # the figure's bounding box.
     size_labels, uses_powers = _problem_size_labels(sizes)
     tick_font_size = (
-        max(9.0, min(13.0, 95.0 / max(len(sizes), 1)))
+        max(10.0, min(15.0, 115.0 / max(len(sizes), 1)))
         if uses_powers
         else max(7.0, min(10.0, 70.0 / max(len(sizes), 1)))
     )
@@ -199,7 +200,7 @@ def _draw_scaling_heatmap(
     axis.set_xticklabels(
         size_labels,
         fontsize=tick_font_size,
-        rotation=90,
+        rotation=0 if uses_powers else 90,
         ha="center",
     )
     axis.set_yticks([])

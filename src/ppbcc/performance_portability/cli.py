@@ -13,7 +13,9 @@ from ppbcc.constants import (
     APPLICATION,
     APPLICATION_EFFICIENCY,
     BENCHMARK_PROBLEM,
+    DESCRIPTION,
     HARDWARE,
+    PARADIGM,
     PERFORMANCE_PORTABILITY,
     PRECISION,
     PROBLEM,
@@ -50,6 +52,7 @@ from ppbcc.performance_portability.selection import (
     AVERAGE_SIZE,
     BEST_SIZE,
     WORST_SIZE,
+    _application_label,
     _filter_problem_size,
     configure_logging,
     load_benchmark_csvs,
@@ -59,6 +62,7 @@ from ppbcc.plot.cascade import plot_cascade
 from ppbcc.plot.complexity_comparison import plot_complexity_comparison
 from ppbcc.plot.heatmap import (
     plot_efficiency_boxplot,
+    plot_efficiency_double_heatmap,
     plot_efficiency_heatmap,
 )
 from ppbcc.plot.navchart import plot_navchart
@@ -91,7 +95,65 @@ def p2analysis_main(argv: list[str] | None = None) -> int:
             "--time and --normalize-time-to-peak are only valid for time-barplot."
         )
         return 1
+    if args.chart == "double-heatmap":
+        if not isinstance(args.size, float) or args.second_size is None:
+            logger.error(
+                "double-heatmap needs two exact numeric sizes: -s/--size for "
+                "the upper-left and --second-size for the lower-right triangles."
+            )
+            return 1
+    elif args.second_size is not None:
+        logger.error("--second-size is only valid for double-heatmap.")
+        return 1
+    if args.sort_alphabetically and args.chart not in {"heatmap", "double-heatmap"}:
+        logger.error(
+            "--sort-alphabetically is only valid for heatmap and double-heatmap."
+        )
+        return 1
     return _analyze(args)
+
+
+def _double_heatmap_efficiencies(
+    rows: pd.DataFrame,
+    description_is_workload: bool,
+    sizes: tuple[float, float],
+    problem: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Calculate application efficiency at the two sizes of a double-heatmap.
+
+    Both sizes share one application and platform universe, so a paradigm
+    benchmarked at only one of them still gets a (missing) cell at the other.
+
+    Args:
+        rows: Selected benchmark rows of every size.
+        description_is_workload: Whether Description belongs to the workload key.
+        sizes: Problem sizes of the upper-left and lower-right triangles.
+        problem: Resolved problem name, used in error messages.
+
+    Returns:
+        Efficiency rows at the first and at the second size.
+
+    Raises:
+        ValueError: If a size has no rows.
+    """
+    applications = sorted(
+        {
+            _application_label(paradigm, description, description_is_workload)
+            for paradigm, description in zip(rows[PARADIGM], rows[DESCRIPTION])
+        }
+    )
+    platforms = sorted(rows[HARDWARE].unique())
+    efficiencies = []
+    for size in sizes:
+        efficiency, _ = calculate_metrics(
+            _filter_problem_size(rows, size, problem),
+            description_is_workload,
+            hardware_universe=platforms,
+            application_universe=applications,
+        )
+        efficiency.insert(0, PROBLEM, problem)
+        efficiencies.append(efficiency)
+    return efficiencies[0], efficiencies[1]
 
 
 def _filter_hardware(
@@ -304,10 +366,13 @@ def _analyze(args: argparse.Namespace) -> int:
         scaling_frames: list[pd.DataFrame] = []
         boxplot_efficiency_frames: list[pd.DataFrame] = []
         problem_pairs: list[tuple[str, str]] = []
+        double_heatmap_efficiencies: tuple[pd.DataFrame, pd.DataFrame] | None = None
 
         for problem_query in (_resolve_problem_query(benchmark_data, args.name),):
             numeric_size = args.size if isinstance(args.size, float) else None
-            selection_size = None if args.chart == "combined" else numeric_size
+            selection_size = (
+                None if args.chart in {"combined", "double-heatmap"} else numeric_size
+            )
             all_size_rows, resolved_problem, description_is_workload = (
                 select_problem_rows(
                     benchmark_data,
@@ -321,7 +386,18 @@ def _analyze(args: argparse.Namespace) -> int:
             problem_pairs.append((problem_query, resolved_problem))
 
             selected = all_size_rows
-            if args.chart == "combined" and numeric_size is not None:
+            if args.chart == "double-heatmap":
+                assert numeric_size is not None
+                double_heatmap_efficiencies = _double_heatmap_efficiencies(
+                    all_size_rows,
+                    description_is_workload,
+                    (numeric_size, args.second_size),
+                    resolved_problem,
+                )
+            if (
+                args.chart in {"combined", "double-heatmap"}
+                and numeric_size is not None
+            ):
                 selected = _filter_problem_size(
                     all_size_rows, numeric_size, resolved_problem
                 )
@@ -604,6 +680,17 @@ def _analyze(args: argparse.Namespace) -> int:
                 problem_title,
                 remove_description=args.remove_description,
                 selected_size=args.size,
+                sort_alphabetically=args.sort_alphabetically,
+            )
+        elif args.chart == "double-heatmap":
+            assert double_heatmap_efficiencies is not None
+            figure = plot_efficiency_double_heatmap(
+                *double_heatmap_efficiencies,
+                problem_title,
+                first_size=args.size,
+                second_size=args.second_size,
+                remove_description=args.remove_description,
+                sort_alphabetically=args.sort_alphabetically,
             )
         elif args.chart == "boxplot":
             boxplot_efficiency = pd.concat(boxplot_efficiency_frames, ignore_index=True)
