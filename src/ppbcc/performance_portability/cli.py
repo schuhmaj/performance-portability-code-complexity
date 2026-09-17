@@ -32,6 +32,17 @@ from ppbcc.performance_portability.complexity import (
     load_complexity_export_data,
     merge_portability_complexity,
 )
+from ppbcc.performance_portability.correlation import (
+    CORRELATION_PP,
+    build_value_table,
+    complexity_by_paradigm,
+    portability_by_paradigm,
+    rank_correlation_matrix,
+    rank_table,
+    resolve_correlation_variable,
+    shared_paradigm_counts,
+    write_rank_correlation_csv,
+)
 from ppbcc.performance_portability.metrics import (
     calculate_average_size_metrics,
     calculate_export_metrics,
@@ -43,6 +54,7 @@ from ppbcc.performance_portability.metrics import (
 )
 from ppbcc.performance_portability.options import (
     P3_CHARTS,
+    RANK_CORRELATION,
     build_p2_parser,
     build_p3_parser,
 )
@@ -294,7 +306,160 @@ def p3analysis_main(argv: list[str] | None = None) -> int:
             "relative to CPP, which --complexity-metric-absolute removes."
         )
         return 1
+    if args.chart != RANK_CORRELATION and args.correlation != "pp":
+        logger.error(f"--correlation is only valid for {RANK_CORRELATION}.")
+        return 1
+    if args.chart == RANK_CORRELATION:
+        if args.legend or args.legend_vertical:
+            logger.error(
+                f"{RANK_CORRELATION} writes a CSV table and draws no figure, "
+                "so it has no legend to separate."
+            )
+            return 1
+        if args.remove_description:
+            logger.error(
+                f"{RANK_CORRELATION} always ranks paradigms, combining "
+                "implementation variants; --remove-description is implied."
+            )
+            return 1
+        if args.log_complexity or args.complexity_absolute:
+            logger.error(
+                "--log-complexity and --complexity-metric-absolute scale "
+                f"plot axes, which {RANK_CORRELATION} does not have; ranks "
+                "are unaffected by either."
+            )
+            return 1
     return _analyze(args)
+
+
+def _problem_metrics(
+    args: argparse.Namespace,
+    selected: pd.DataFrame,
+    description_is_workload: bool,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Calculate efficiency and PP under the selected ``--size`` mode.
+
+    Args:
+        args: Parsed arguments supplying ``size``, ``average_over``, and
+            ``non_zero_pp``.
+        selected: Benchmark rows of one problem.
+        description_is_workload: Whether Description belongs to the workload key.
+
+    Returns:
+        A pair of application-efficiency and performance-portability rows.
+    """
+    if args.size == AVERAGE_SIZE:
+        return calculate_average_size_metrics(
+            selected,
+            description_is_workload,
+            non_zero_pp=args.non_zero_pp,
+            average_over=args.average_over,
+        )
+    if args.size in {BEST_SIZE, WORST_SIZE}:
+        return calculate_extreme_size_metrics(
+            selected,
+            description_is_workload,
+            args.size,
+            non_zero_pp=args.non_zero_pp,
+        )
+    return calculate_metrics(
+        selected,
+        description_is_workload,
+        non_zero_pp=args.non_zero_pp,
+    )
+
+
+def _rank_correlation(args: argparse.Namespace, benchmark_data: pd.DataFrame) -> None:
+    """Write the cross-problem rank correlations of one variable as CSV.
+
+    Args:
+        args: Parsed ``p3analysis`` arguments.
+        benchmark_data: Combined benchmark results.
+
+    Raises:
+        ValueError: If the selection cannot produce a correlation table.
+    """
+    variable = resolve_correlation_variable(args.correlation)
+    values: dict[str, pd.Series] = {}
+    value_column = PERFORMANCE_PORTABILITY if variable == CORRELATION_PP else variable
+    for problem_query in _resolve_problem_queries(benchmark_data, args.name):
+        rows, problem, description_is_workload = select_problem_rows(
+            benchmark_data,
+            problem_query,
+            args.description_include,
+            args.description_exclude,
+            args.size if isinstance(args.size, float) else None,
+            args.precision,
+        )
+        if problem in values:
+            raise ValueError(
+                f"-n/--name selects the problem {problem!r} more than once."
+            )
+        paradigms = sorted(set(rows[PARADIGM].astype(str)))
+        if variable == CORRELATION_PP:
+            _, portability = _problem_metrics(args, rows, description_is_workload)
+            values[problem] = portability_by_paradigm(portability, paradigms)
+        else:
+            values[problem], value_column = complexity_by_paradigm(
+                args.complexity, problem_query, args.correlation, paradigms
+            )
+
+    table = build_value_table(values)
+    logger.debug(f"{value_column} by paradigm:\n{table.to_string()}")
+    logger.info(
+        f"Rank-correlating {value_column} over "
+        f"{int(table.notna().any(axis=1).sum())} paradigm(s) and "
+        f"{len(table.columns)} problem(s)"
+    )
+    matrix = rank_correlation_matrix(table)
+    logger.debug(
+        "Shared paradigms per pair:\n"
+        f"{shared_paradigm_counts(table).to_string()}"
+    )
+
+    output = resolve_output_path(
+        args.output, list(table.columns), RANK_CORRELATION
+    ).with_suffix(".csv")
+    write_rank_correlation_csv(matrix, output)
+    if args.export_to_csv:
+        ranks = rank_table(table, variable, value_column)
+        ranks_output = output.with_name(f"{output.stem}_ranks.csv")
+        ranks.to_csv(ranks_output, index=False)
+        logger.success(f"Wrote paradigm ranks: {ranks_output.resolve()}")
+
+
+def _resolve_problem_queries(
+    benchmark_data: pd.DataFrame, name: str | None
+) -> list[str]:
+    """Split ``-n/--name`` into the problem queries of a cross-problem table.
+
+    Args:
+        benchmark_data: Combined benchmark results.
+        name: Comma-separated ``-n/--name`` value, or ``None`` for every
+            problem present in the data.
+
+    Returns:
+        At least two problem queries.
+
+    Raises:
+        ValueError: If fewer than two problems are selected.
+    """
+    if name is None:
+        available = benchmark_data[BENCHMARK_PROBLEM].dropna().unique()
+        problems = sorted({str(value) for value in available})
+        if len(problems) < 2:
+            raise ValueError(
+                "rank-correlation compares the paradigm orderings of at least "
+                f"two problems; the CSVs contain {problems}."
+            )
+        return problems
+    queries = [query.strip() for query in name.split(",") if query.strip()]
+    if len(queries) < 2:
+        raise ValueError(
+            "rank-correlation needs at least two comma-separated problems in "
+            f"-n/--name, or no -n at all to use every problem; got {name!r}."
+        )
+    return queries
 
 
 def _resolve_problem_query(benchmark_data: pd.DataFrame, name: str | None) -> str:
@@ -359,6 +524,9 @@ def _analyze(args: argparse.Namespace) -> int:
         if args.chart == "time-barplot":
             _time_barplot(args, benchmark_data)
             return 0
+        if args.chart == RANK_CORRELATION:
+            _rank_correlation(args, benchmark_data)
+            return 0
         efficiency_frames: list[pd.DataFrame] = []
         portability_frames: list[pd.DataFrame] = []
         export_efficiency_frames: list[pd.DataFrame] = []
@@ -402,30 +570,9 @@ def _analyze(args: argparse.Namespace) -> int:
                     all_size_rows, numeric_size, resolved_problem
                 )
 
-            if args.size == AVERAGE_SIZE:
-                problem_efficiency, problem_portability = (
-                    calculate_average_size_metrics(
-                        selected,
-                        description_is_workload,
-                        non_zero_pp=args.non_zero_pp,
-                        average_over=args.average_over,
-                    )
-                )
-            elif args.size in {BEST_SIZE, WORST_SIZE}:
-                problem_efficiency, problem_portability = (
-                    calculate_extreme_size_metrics(
-                        selected,
-                        description_is_workload,
-                        args.size,
-                        non_zero_pp=args.non_zero_pp,
-                    )
-                )
-            else:
-                problem_efficiency, problem_portability = calculate_metrics(
-                    selected,
-                    description_is_workload,
-                    non_zero_pp=args.non_zero_pp,
-                )
+            problem_efficiency, problem_portability = _problem_metrics(
+                args, selected, description_is_workload
+            )
             problem_efficiency.insert(0, PROBLEM, resolved_problem)
             problem_portability.insert(0, PROBLEM, resolved_problem)
             efficiency_frames.append(problem_efficiency)

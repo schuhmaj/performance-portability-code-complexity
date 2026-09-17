@@ -25,6 +25,12 @@ Complexity Join
 .. automodule:: ppbcc.performance_portability.complexity
    :members:
 
+Rank Correlation
+----------------
+
+.. automodule:: ppbcc.performance_portability.correlation
+   :members:
+
 Command Line Interface
 ----------------------
 

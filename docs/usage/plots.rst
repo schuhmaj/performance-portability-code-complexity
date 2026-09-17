@@ -3,9 +3,9 @@
 Available Plots
 ===============
 
-``ppbcc p2analysis`` and ``ppbcc p3analysis`` render seven chart types, selected
-by their first argument. All of them are shown below, all but one for the same
-benchmark problem, so they can be compared directly.
+``ppbcc p2analysis`` and ``ppbcc p3analysis`` render eight chart types, selected
+by their first argument, and one table. All of them are shown below, all but one
+for the same benchmark problem, so they can be compared directly.
 
 .. admonition:: Where this data comes from
    :class: note
@@ -53,6 +53,8 @@ Chart overview
 | ``boxplot``               | Efficiency distribution per paradigm            | ``p2analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
 | ``time-barplot``          | Runtime per paradigm, grouped by platform       | ``p2analysis``    |
++---------------------------+-------------------------------------------------+-------------------+
+| ``rank-correlation``      | CSV: do two problems rank the paradigms alike?  | ``p3analysis``    |
 +---------------------------+-------------------------------------------------+-------------------+
 
 Cascade plot
@@ -284,6 +286,63 @@ measured ceilings of :doc:`profiling`.
 ``-e/--export-to-csv`` writes the plotted runtimes next to the chart as
 ``<plot-prefix>.csv``.
 
+Rank correlation
+----------------
+
+Every other chart answers a question about one benchmark problem.
+``rank-correlation`` answers one about the set of them: does a problem's
+ordering of the paradigms predict the next problem's? It writes Spearman's
+:math:`\rho` between every pair of problems as a CSV matrix rather than a
+figure, because the interesting content is a handful of numbers that belong in
+a table or in running text.
+
+.. code-block:: bash
+
+    ppbcc p3analysis rank-correlation ./code-complexity/code-complexity.csv \
+      ./Results_* --correlation pp --non-zero-pp -s avg -x "Cublas" -e
+
+.. code-block:: text
+
+    Problem,MatrixMultiplication,NBody,Polyhedral,VecAdd
+    MatrixMultiplication,1.0,0.754,0.776,0.503
+    NBody,0.754,1.0,0.785,0.446
+    Polyhedral,0.776,0.785,1.0,0.385
+    VecAdd,0.503,0.446,0.385,1.0
+
+A high :math:`\rho` means the two problems agree on which paradigms are good;
+a :math:`\rho` near zero means one problem says nothing about the other, which
+is the case worth knowing about before a single workload is used to argue about
+paradigms in general.
+
+``--correlation`` picks the variable that is ranked:
+
+* ``pp`` (default) — performance portability, computed exactly as the other
+  charts compute it, so ``-s``, ``--average-over``, ``--non-zero-pp``,
+  ``-p/--precision`` and the description filters all apply. The default ``-s
+  all`` treats every size as a workload, making :math:`\Phi` the harmonic mean
+  over platforms of the size-averaged application efficiencies.
+* a complexity metric — ``sloc``, ``halstead-difficulty`` and the other names
+  and aliases ``-c/--complexity-metric`` accepts. Values are read unscaled;
+  dividing a problem's paradigms by that problem's plain-C++ baseline cannot
+  change the problem's order.
+
+Both variables are reduced to one value per **paradigm**, since a paradigm is
+what the problems have in common — implementation variants such as
+``Cuda[Naive]`` exist in one problem and not the next. The best variant stands
+for its paradigm in :math:`\Phi`, and variants are reduced to their median for
+a complexity metric. Only paradigms with benchmark results are ranked, so the
+plain-C++ baseline and any framework measured for complexity alone stay out and
+every variable ranks the same paradigms. Each pair is then correlated over the
+paradigms both of its problems have a value for; a pair sharing fewer than
+three is left empty with a warning.
+
+``-n/--name`` takes a comma-separated list of problems and defaults to every
+problem in the CSVs. ``-e/--export-to-csv`` writes the underlying per-paradigm
+values and their ranks — best first, which is the highest :math:`\Phi` or the
+lowest complexity — to ``<plot-prefix>_ranks.csv``. Having no figure, the chart
+rejects ``-l/--legend``, ``--remove-description`` (which it always implies) and
+``--log-complexity``.
+
 Legends and output
 ------------------
 
@@ -293,4 +352,5 @@ PDF next to the plot (``<name>_legend.pdf``) with four columns; add
 when a problem has many paradigms.
 
 ``-o/--output`` sets the output path; without a suffix, ``.pdf`` is appended.
-The default name is ``<problem>_<chart>.pdf``.
+The default name is ``<problem>_<chart>.pdf``. ``rank-correlation`` writes
+``.csv`` instead, named after every problem it correlated.

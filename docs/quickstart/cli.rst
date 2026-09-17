@@ -162,14 +162,16 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
      - Meaning
    * - ``PLOT``
      - ``p2analysis``: ``cascade``, ``heatmap``, ``double-heatmap``, ``boxplot``, ``time-barplot``;
-       ``p3analysis``: ``navchart``, ``combined``, ``complexity-comparison``
+       ``p3analysis``: ``navchart``, ``combined``, ``complexity-comparison``,
+       ``rank-correlation``
    * - ``COMPLEXITY_CSV``
      - ``p3analysis`` only: code-complexity CSV with one row per implementation
    * - ``CSV``
      - One or more CSVs produced by ``ppbcc benchmark``
    * - ``-n, --name``
      - Benchmark problem to plot; exact case-insensitive match preferred, unique substring okay.
-       May be omitted when the CSVs contain exactly one problem
+       May be omitted when the CSVs contain exactly one problem. ``rank-correlation``
+       takes a comma-separated list and defaults to every problem in the CSVs
    * - ``-c, --complexity-metric``
      - ``p3analysis`` only: SLOC, Halstead vocabulary/length/volume/difficulty/effort
        (default: ``halstead-difficulty``)
@@ -179,6 +181,10 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
      - x-axis metric of ``complexity-comparison`` (default: ``sloc``); ``-c`` is its y axis
    * - ``--log-complexity``
      - ``p3analysis`` only: logarithmic complexity axes
+   * - ``--correlation``
+     - ``rank-correlation`` only: the variable whose paradigm ordering is
+       correlated — ``pp`` (default) or a complexity metric such as
+       ``halstead-difficulty`` or ``sloc``
    * - ``-s, --size``
      - ``all`` (default), an exact size, or ``avg``/``best``/``worst``
    * - ``--average-over``
@@ -200,7 +206,8 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
    * - ``-e, --export-to-csv``
      - Also export efficiency and portability data as CSV; ``p3analysis`` adds every complexity metric
    * - ``-o, --output``
-     - Output path; defaults to ``<problem>_<chart>.pdf``
+     - Output path; defaults to ``<problem>_<chart>.pdf``, or ``.csv`` for
+       ``rank-correlation``
 
 Details and examples: :doc:`../usage/p3analysis` and :doc:`../usage/plots`.
 
@@ -221,6 +228,11 @@ combinations rather than silently ignoring them:
        percentages of the plain-C++ baseline and rejects it
    * - ``--compare-metric``
      - ``complexity-comparison`` only
+   * - ``--correlation``
+     - ``rank-correlation`` only
+   * - ``-l, --legend`` / ``--remove-description`` / ``--log-complexity``
+     - every chart except ``rank-correlation``, which writes a CSV table
+       instead of a figure and always ranks paradigms
    * - ``-H, --hardware``
      - ``boxplot``, ``time-barplot``
    * - ``-t, --time`` / ``--normalize-time-to-peak``

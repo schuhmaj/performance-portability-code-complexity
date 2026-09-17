@@ -23,7 +23,10 @@ accompanies that work. See :ref:`p3analysis-references`.
 ``-n/--name`` selects the benchmark problem. An exact case-insensitive match
 wins; a unique substring is accepted, so ``Polyhedral`` resolves to
 ``PolyhedralGravity``. It may be omitted when the benchmark CSVs contain exactly
-one problem.
+one problem. The one output that spans problems rather than picking one is
+``rank-correlation``: it takes a comma-separated list of at least two problems,
+defaults to every problem in the CSVs, and reports how far their paradigm
+orderings agree (see :doc:`plots`).
 
 Metrics
 -------

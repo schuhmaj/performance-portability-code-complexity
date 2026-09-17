@@ -175,17 +175,19 @@ Application efficiency, performance portability, and plots from benchmark CSVs.
 `p2analysis PLOT CSV...` renders the charts that need benchmark results only
 (`cascade`, `heatmap`, `boxplot`, `time-barplot`); `p3analysis PLOT COMPLEXITY_CSV CSV...`
 renders the charts that also need code complexity (`navchart`, `combined`,
-`complexity-comparison`).
+`complexity-comparison`) plus `rank-correlation`, which writes a CSV table
+instead of a figure.
 
 | Option | Meaning |
 | --- | --- |
 | `PLOT` | Chart to render; the valid choices depend on the command |
 | `COMPLEXITY_CSV` | `p3analysis` only: code-complexity CSV with one row per implementation |
 | `CSV` | One or more CSVs produced by `ppbcc benchmark` |
-| `-n, --name` | Benchmark problem; exact case-insensitive match preferred, unique substring accepted. Optional when the CSVs hold one problem |
+| `-n, --name` | Benchmark problem; exact case-insensitive match preferred, unique substring accepted. Optional when the CSVs hold one problem; `rank-correlation` takes a comma-separated list and defaults to all of them |
 | `-c, --complexity-metric` | `p3analysis` only: SLOC, Halstead vocabulary/length/volume/difficulty/effort (default: `halstead-difficulty`) |
 | `--complexity-metric-absolute` | `p3analysis` only: plot absolute complexity instead of a percentage of plain C++ |
 | `--compare-metric` | `complexity-comparison` only: x-axis metric (default: `sloc`) |
+| `--correlation` | `rank-correlation` only: variable whose paradigm ordering is correlated — `pp` (default), `halstead-difficulty`, `sloc`, ... |
 | `-s, --size` | `all` (default), an exact size, or `avg`/`best`/`worst` |
 | `--average-over` | With `-s avg`: average Φ over sizes (`pp`, default) or compute Φ from size-averaged efficiencies (`efficiency`) |
 | `--non-zero-pp` | Calculate Φ over supported platforms only |
@@ -195,19 +197,25 @@ renders the charts that also need code complexity (`navchart`, `combined`,
 | `--remove-description` | Drop bracketed labels such as `[Naive]`; efficiency charts combine variants by paradigm |
 | `-l, --legend` | Save the legend as a separate PDF (`--legend--vertical` for one column) |
 | `-e, --export-to-csv` | Also export efficiency and portability data as CSV |
-| `-o, --output` | Output path; defaults to `<problem>_<chart>.pdf` |
+| `-o, --output` | Output path; defaults to `<problem>_<chart>.pdf`, or `.csv` for `rank-correlation` |
 
 ```bash
 ppbcc p3analysis combined ./code-complexity/code-complexity.csv ./Results_* \
   -n MatrixMultiplication -c halstead-difficulty --log-complexity \
   --non-zero-pp --remove-description -s avg -x "Cublas"
+
+# Does one problem's paradigm ordering predict another's? Spearman's rho
+# between every pair of problems, as a CSV matrix.
+ppbcc p3analysis rank-correlation ./code-complexity/code-complexity.csv ./Results_* \
+  --correlation pp --non-zero-pp -s avg -x "Cublas" -e
 ```
 
 Not every option applies to every chart, and invalid combinations are rejected
 rather than silently ignored: `-H/--hardware` is valid for `boxplot` and
 `time-barplot` only, `time-barplot` needs one exact size (the largest by default), `boxplot`
-needs `-s all` or an exact numeric size, and `complexity-comparison` rejects
-`--complexity-metric-absolute`.
+needs `-s all` or an exact numeric size, `complexity-comparison` rejects
+`--complexity-metric-absolute`, and `rank-correlation` — having no figure —
+rejects `-l/--legend`, `--remove-description` and `--log-complexity`.
 See [`examples/`](examples/) for one rendered example of every chart together
 with the exact command that produced it.
 

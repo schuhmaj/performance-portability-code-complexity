@@ -16,7 +16,9 @@ from ppbcc.performance_portability.selection import (
 #: Charts that need benchmark results only.
 P2_CHARTS = ("cascade", "heatmap", "double-heatmap", "boxplot", "time-barplot")
 #: Charts that combine benchmark results with code complexity.
-P3_CHARTS = ("navchart", "combined", "complexity-comparison")
+P3_CHARTS = ("navchart", "combined", "complexity-comparison", "rank-correlation")
+#: The P3 output that is a CSV table rather than a figure.
+RANK_CORRELATION = "rank-correlation"
 
 
 def _new_parser(
@@ -67,7 +69,9 @@ def _add_shared_arguments(parser: argparse.ArgumentParser) -> None:
         help=(
             "Benchmark problem to plot. Exact case-insensitive matches are "
             "preferred; a unique substring match is accepted. May be omitted "
-            "when the CSVs contain exactly one problem."
+            "when the CSVs contain exactly one problem. rank-correlation takes "
+            "a comma-separated list of at least two problems, and defaults to "
+            "every problem in the CSVs."
         ),
     )
     general.add_argument(
@@ -306,5 +310,19 @@ def build_p3_parser() -> argparse.ArgumentParser:
         "--log-complexity",
         action="store_true",
         help="Use logarithmic complexity axes.",
+    )
+
+    correlation = parser.add_argument_group("rank-correlation options")
+    correlation.add_argument(
+        "--correlation",
+        default="pp",
+        metavar="VARIABLE",
+        help=(
+            "Variable whose paradigm ordering is correlated between problems: "
+            "'pp' for performance portability, or a complexity metric such as "
+            "'halstead-difficulty' or 'sloc' (the same names and aliases "
+            "-c/--complexity-metric accepts). Selects the variable instead of "
+            "-c/--complexity-metric, which rank-correlation ignores."
+        ),
     )
     return parser
