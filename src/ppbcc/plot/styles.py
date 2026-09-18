@@ -531,6 +531,9 @@ def save_figure(figure: plt.Figure, output: Path) -> None:
         output: Destination path.
     """
     output.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(output, bbox_inches="tight")
+    # Embed fonts as TrueType (Type 42) rather than matplotlib's default Type 3,
+    # which publishers reject as bitmapped fonts.
+    with matplotlib.rc_context({"pdf.fonttype": 42, "ps.fonttype": 42}):
+        figure.savefig(output, bbox_inches="tight")
     plt.close(figure)
     logger.success(f"Wrote plot: {output.resolve()}")
