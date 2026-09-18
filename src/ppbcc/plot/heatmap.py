@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 
 import matplotlib.pyplot as plt
@@ -10,7 +11,9 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize, to_rgba
+from matplotlib.font_manager import FontProperties
 from matplotlib.patches import Polygon, Rectangle
+from matplotlib.textpath import TextPath
 
 from ppbcc.constants import (
     APPLICATION,
@@ -18,7 +21,7 @@ from ppbcc.constants import (
     HARDWARE,
 )
 from ppbcc.performance_portability.selection import ALL_SIZE
-from ppbcc.plot.styles import _display_application, _framework_colors
+from ppbcc.plot.styles import _display_application, _framework_colors, font_points
 
 #: Colormap shared by both efficiency heatmaps.
 HEATMAP_COLORMAP = "viridis"
@@ -26,6 +29,38 @@ HEATMAP_COLORMAP = "viridis"
 MISSING_COLOR = "black"
 #: Annotation of a cell whose paradigm was never benchmarked on the platform.
 MISSING_LABEL = "-"
+#: Rotation of the double heatmap's paradigm labels, in degrees.
+DOUBLE_HEATMAP_LABEL_ANGLE = 35
+#: Inches of clear space between two neighbouring paradigm labels.
+DOUBLE_HEATMAP_COLUMN_PADDING = 0.12
+#: Line height of a paradigm label, as a multiple of its font size.
+DOUBLE_HEATMAP_LINE_SPACING = 1.3
+#: Narrowest double-heatmap column, for problems with short paradigm names.
+DOUBLE_HEATMAP_MIN_COLUMN_WIDTH = 1.5
+#: Inches of figure height per platform row of the double heatmap.
+DOUBLE_HEATMAP_ROW_HEIGHT = 0.85
+#: Inches of figure width taken by the axis labels and the color bar.
+DOUBLE_HEATMAP_SIDE_CHROME = 3.6
+#: Inches of figure height taken by the title and the axis label.
+DOUBLE_HEATMAP_VERTICAL_CHROME = 2.2
+#: Share of a column one cell value may occupy. It sets the column pitch, so
+#: a smaller share is a wider figure: at one text width that is a shorter
+#: chart whose values still print at about 5.5 pt.
+DOUBLE_HEATMAP_ANNOTATION_SHARE = 0.40
+
+
+def _text_width(text: str, size: float) -> float:
+    """Measure a string's width in inches at a font size, without rendering.
+
+    Args:
+        text: String to measure.
+        size: Font size in points.
+
+    Returns:
+        The width the string occupies, in inches.
+    """
+    path = TextPath((0.0, 0.0), text, size=size, prop=FontProperties(size=size))
+    return float(path.get_extents().width) / 72.0
 
 
 def _format_size(size: float) -> str:
@@ -300,12 +335,45 @@ def plot_efficiency_double_heatmap(
         for data in (first_data, second_data)
     ]
 
-    width = max(8.0, 3.0 + 1.25 * len(application_order))
-    height = max(4.8, 2.7 + 0.85 * len(platforms))
+    paradigm_labels = [
+        _display_application(str(application), remove_description)
+        for application in application_order
+    ]
+
+    # A page gives this chart width but no height, so every size is derived
+    # from the width one column needs and the height is kept to what the rows
+    # and the label band actually use.
+    tick_size = font_points("xtick.labelsize", 1.55)
+    label_size = font_points("axes.labelsize", 1.65)
+    title_size = font_points("axes.titlesize", 1.60)
+
+    # The cell values are what the chart is read for, so the column pitch is
+    # sized for them: a value takes a fixed share of its half-cell, wide enough
+    # to read and narrow enough to stay off the cell border and the diagonal.
+    font_size = font_points("font.size", 1.4)
+    angle = math.radians(DOUBLE_HEATMAP_LABEL_ANGLE)
+    # Rotated labels are parallel lines one column pitch apart, so what keeps
+    # them legible is the perpendicular gap, pitch * sin(angle) — a shallow
+    # angle needs a wider pitch, but only in proportion to the line height and
+    # never to the label length, which merely runs alongside its neighbour.
+    line_height = DOUBLE_HEATMAP_LINE_SPACING * tick_size / 72.0
+    column_width = max(
+        DOUBLE_HEATMAP_MIN_COLUMN_WIDTH,
+        _text_width("0.00", font_size) / DOUBLE_HEATMAP_ANNOTATION_SHARE,
+        line_height / math.sin(angle) + DOUBLE_HEATMAP_COLUMN_PADDING,
+    )
+    # The band the labels occupy is as deep as the longest one reaching down
+    # at the label angle.
+    longest_label = max(_text_width(label, tick_size) for label in paradigm_labels)
+    width = DOUBLE_HEATMAP_SIDE_CHROME + column_width * len(application_order)
+    height = (
+        DOUBLE_HEATMAP_VERTICAL_CHROME
+        + longest_label * math.sin(angle)
+        + DOUBLE_HEATMAP_ROW_HEIGHT * len(platforms)
+    )
     figure, axis = plt.subplots(figsize=(width, height))
     colormap = plt.get_cmap(HEATMAP_COLORMAP)
     norm = Normalize(vmin=0.0, vmax=1.0)
-    font_size = plt.rcParams["font.size"] * 0.7
 
     # Triangle corners in cell units, with rows growing downwards, and where
     # each half's annotation sits: pulled from the centroid towards the corner
@@ -367,27 +435,33 @@ def plot_efficiency_double_heatmap(
         spine.set_visible(False)
     axis.tick_params(length=0)
     axis.set_xticks(np.arange(columns) + 0.5)
+    # Anchored rotation keeps each label's end under its own column rather
+    # than letting it drift left as the labels grow.
     axis.set_xticklabels(
         [
             _display_application(str(application), remove_description)
             for application in application_order
         ],
-        rotation=35,
+        rotation=DOUBLE_HEATMAP_LABEL_ANGLE,
         ha="right",
+        rotation_mode="anchor",
+        fontsize=tick_size,
     )
     axis.set_yticks(np.arange(rows) + 0.5)
-    axis.set_yticklabels(platforms, rotation=0)
-    axis.set_xlabel("Paradigm")
-    axis.set_ylabel("Platform")
+    axis.set_yticklabels(platforms, rotation=0, fontsize=tick_size)
+    axis.set_xlabel("Paradigm", fontsize=label_size)
+    axis.set_ylabel("Platform", fontsize=label_size)
     axis.set_title(
         f"{problem_title} Application Efficiency Heatmap\n"
         f"\u25e4 Problem size: {_format_size(first_size)}    "
-        f"\u25e2 Problem size: {_format_size(second_size)}"
+        f"\u25e2 Problem size: {_format_size(second_size)}",
+        fontsize=title_size,
     )
     color_bar = figure.colorbar(
         ScalarMappable(norm=norm, cmap=colormap), ax=axis, shrink=0.9
     )
-    color_bar.set_label("Application Efficiency")
+    color_bar.set_label("Application Efficiency", fontsize=label_size)
+    color_bar.ax.tick_params(labelsize=tick_size)
     color_bar.outline.set_visible(False)
     figure.tight_layout()
     return figure
