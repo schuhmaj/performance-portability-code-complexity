@@ -1,6 +1,6 @@
 # ppbcc
 
-[![DOI](https://zenodo.org/badge/845977933.svg)](https://doi.org/10.5281/zenodo.22830313)
+[![DOI](https://zenodo.org/badge/1303090081.svg)](https://doi.org/10.5281/zenodo.22830260)
 
 **P**erformance-**p**ortability **b**enchmarking, analysis, plotting, and
 **c**ode **c**omplexity for **C++** and **GPU-enriched C++**.
