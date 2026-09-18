@@ -134,17 +134,29 @@ def test_profile_command_exports_next_to_the_executable_name(tmp_path):
     assert f"--benchmark_out={tmp_path / 'out' / 'polyhedral_cuda.json'}" in command
 
 
-def test_profile_command_disables_aslr_by_default(tmp_path):
+def test_profile_command_disables_aslr_by_default(tmp_path, monkeypatch):
     # Google Benchmark re-executes the process to drop ASLR, and Nsight Compute
-    # hangs on some binaries when it follows that exec.
+    # hangs on some binaries when it follows that exec. setarch only exists on
+    # Linux, so stub the lookup to keep the test independent of the host.
+    monkeypatch.setattr(
+        "ppbcc.profiling.runner.shutil.which",
+        lambda name: "/usr/bin/setarch" if name == "setarch" else None,
+    )
     command = profile_command("ncu", tmp_path / "matMul_kokkos", tmp_path / "r.ncu-rep")
-    assert command[:1] == aslr_prefix()[:1]
+    assert command[:1] == aslr_prefix()[:1] == ["/usr/bin/setarch"]
     assert "-R" in command[: command.index("ncu")]
 
     plain = profile_command(
         "ncu", tmp_path / "matMul_kokkos", tmp_path / "r.ncu-rep", disable_aslr=False
     )
     assert plain[0] == "ncu"
+
+
+def test_profile_command_without_setarch_runs_ncu_directly(tmp_path, monkeypatch):
+    monkeypatch.setattr("ppbcc.profiling.runner.shutil.which", lambda name: None)
+    assert aslr_prefix() == []
+    command = profile_command("ncu", tmp_path / "matMul_kokkos", tmp_path / "r.ncu-rep")
+    assert command[0] == "ncu"
 
 
 # --------------------------------------------------------------------------- #

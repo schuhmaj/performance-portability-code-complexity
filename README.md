@@ -27,12 +27,13 @@ The package is split into five focused areas:
   token counting (**stand-alone**).
 - `ppbcc.benchmark` — discovers and runs Google Benchmark executables and
   consolidates their JSON reports into tidy CSV data.
-- `ppbcc.profiling` — batch-runs Nvidia Nsight Compute (`ncu`) over the same
-  executables and turns the per-kernel counters into a roofline model.
+- `ppbcc.profiling` — batch-runs a GPU profiler (Nsight Compute, Nsight
+  Systems, Nsight Graphics, or LIKWID) over the same executables and turns the
+  counters into a roofline model.
 - `ppbcc.performance_portability` — loads benchmark CSVs and calculates
   application efficiency and performance portability.
 - `ppbcc.plot` — Cascade, Navchart, combined, application-efficiency heatmap,
-  and boxplot visualizations.
+  boxplot, runtime bar plot, complexity comparison, and roofline visualizations.
 
 The tool computes the classic Halstead measures (volume, difficulty, effort,
 language level, ...) and line-based size metrics for a set of C++ source
@@ -120,6 +121,29 @@ Runs Google Benchmark targets and consolidates their JSON reports into one CSV.
 | Option | Meaning |
 | --- | --- |
 | `-b, --build-dir` | Build folder used as the working directory for the whole pipeline |
+| `-p, --path` | Directories searched recursively, relative to `--build-dir` |
+| `-r, --regex` | **Required.** Pattern(s) matched against file paths to select executables (or reports) |
+| `-x, --exclude` | Pattern(s) excluding matched paths, e.g. `'.*_cpp'` |
+| `-s, --skip-benchmark` | Run nothing; locate existing JSON reports and only consolidate them |
+| `-n, --dry-run` | List the matched executables (or reports) and exit |
+| `-H, --hardware` | Value stored in the `Hardware` column, e.g. `"NVIDIA RTX5080"` |
+| `-o, --output` | Base name of the consolidated CSV (defaults to a timestamped name) |
+
+```bash
+ppbcc benchmark -p src -H "NVIDIA RTX5080" -r "vec_.*" "nbody_.*" -x ".*_cpp" --dry-run
+```
+
+### `ppbcc profile`
+
+Batch-profiles GPU kernels, consolidates the counters into one CSV, and draws a
+roofline model. Expects executables built with `-DPPB_PROFILING=ON`.
+`--profiler` picks the backend: `ncu` (default, one row per kernel launch),
+`nsys`, `ngfx`, or `likwid` (one row per marked region, needs
+`-DPPB_ENABLE_LIKWID=ON` too).
+
+| Option | Meaning |
+| --- | --- |
+| `-b, --build-dir` | Build folder used as the working directory for the whole pipeline |
 | `--profiler` | `ncu` (default), `nsys`, `ngfx` or `likwid` |
 | `--profiler-path` | Path to that backend's CLI; found automatically otherwise |
 | `-O, --option` | `NAME=VALUE` setting of the selected backend; `--help` lists the names |
@@ -173,7 +197,7 @@ without it the launches are unnamed and all of them are kept, with a warning.
 
 Application efficiency, performance portability, and plots from benchmark CSVs.
 `p2analysis PLOT CSV...` renders the charts that need benchmark results only
-(`cascade`, `heatmap`, `boxplot`, `time-barplot`); `p3analysis PLOT COMPLEXITY_CSV CSV...`
+(`cascade`, `heatmap`, `double-heatmap`, `boxplot`, `time-barplot`); `p3analysis PLOT COMPLEXITY_CSV CSV...`
 renders the charts that also need code complexity (`navchart`, `combined`,
 `complexity-comparison`) plus `rank-correlation`, which writes a CSV table
 instead of a figure.

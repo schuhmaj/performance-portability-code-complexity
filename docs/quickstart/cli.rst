@@ -244,5 +244,5 @@ combinations rather than silently ignoring them:
 Logging
 -------
 
-All three commands log through ``loguru`` at ``INFO`` by default. ``-v`` raises
+All commands log through ``loguru`` at ``INFO`` by default. ``-v`` raises
 the level to ``DEBUG``, ``-vv`` to ``TRACE``.

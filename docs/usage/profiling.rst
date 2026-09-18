@@ -93,6 +93,16 @@ runs nothing at all and only re-parses the reports already in ``--report-dir``.
 That splits nicely into a collection pass per toolchain (``--no-csv``, writing
 into a shared ``--report-dir``) and one consolidation pass over all of them.
 
+.. note::
+
+    Google Benchmark re-executes its process to switch off address space
+    randomization, and Nsight Compute hangs on some binaries
+    (``matMul_kokkos``, ``matMul_omp``) when it follows that ``exec``. The
+    ``ncu`` backend therefore starts every run through ``setarch <arch> -R``,
+    so the re-exec never happens. ``setarch`` ships with util-linux; where it
+    is missing, the run keeps the re-exec and a warning is logged.
+    ``-O aslr=on`` opts out.
+
 What is measured
 ----------------
 
